@@ -32,9 +32,10 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
         self.indices = self.indices[(Bases_loc==0) & (self.y!=0)]
         self.indices=np.clip(self.indices,self.WINDOW//2,len(self.x)-self.WINDOW//2 -1)
         self.indices=np.unique(self.indices)
-        self.indices = np.random.choice(self.indices, size=self.max_data, replace=False)
-        # self.indices = np.arange(self.WINDOW//2, n_data+self.WINDOW//2)[Bases_loc==0]
-        np.random.shuffle(self.indices)
+        self.on_epoch_end()
+        # self.indices = np.random.choice(self.indices, size=self.max_data, replace=False)
+        # # self.indices = np.arange(self.WINDOW//2, n_data+self.WINDOW//2)[Bases_loc==0]
+        # np.random.shuffle(self.indices)
 
     def __len__(self):
         return int(np.ceil(len(self.indices) / self.batch_size))
@@ -121,38 +122,38 @@ if __name__ == "__main__":
     X_2R=np.load('/home/florian/projet/r6.16/seq.npz')['2R']
     X_3L=np.load('/home/florian/projet/r6.16/seq.npz')['3L']
     X_3R=np.load('/home/florian/projet/r6.16/seq.npz')['3R']
-    X5=np.load('/home/florian/projet/r6.16/seq.npz')['4']
+    X_4=np.load('/home/florian/projet/r6.16/seq.npz')['4']
     X_X=np.load('/home/florian/projet/r6.16/seq.npz')['X']
     X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 
     #create scATAC values for each chr
-    Y_2L=np.load('/home/florian/projet/scATACseq_14chr.npz')['2L'][0]
-    Y_2L[Y_2L >= 100] = 100
-    Y_2L=Y_2L/100
+    Y_2L=np.load('/home/florian/projet/scATACseq_KC.npz')['2L'][0]
+    Y_2L[Y_2L >= 20] = 20
+    Y_2L=Y_2L/20
 
-    Y_2R=np.load('/home/florian/projet/scATACseq_14chr.npz')['2R'][0]
-    Y_2R[Y_2R >= 100] = 100
-    Y_2R=Y_2R/100
+    Y_2R=np.load('/home/florian/projet/scATACseq_KC.npz')['2R'][0]
+    Y_2R[Y_2R >= 20] = 20
+    Y_2R=Y_2R/20
 
-    Y_3L=np.load('/home/florian/projet/scATACseq_14chr.npz')['3L'][0]
-    Y_3L[Y_3L >= 100] = 100
-    Y_3L=Y_3L/100
+    Y_3L=np.load('/home/florian/projet/scATACseq_KC.npz')['3L'][0]
+    Y_3L[Y_3L >= 20] = 20
+    Y_3L=Y_3L/20
 
-    Y_3R=np.load('/home/florian/projet/scATACseq_14chr.npz')['3R'][0]
-    Y_3R[Y_3R >= 100] = 100
-    Y_3R=Y_3R/100
+    Y_3R=np.load('/home/florian/projet/scATACseq_KC.npz')['3R'][0]
+    Y_3R[Y_3R >= 20] = 20
+    Y_3R=Y_3R/20
 
-    Y5=np.load('/home/florian/projet/scATACseq_14chr.npz')['4'][0]
-    Y5[Y5 >= 100] = 100
-    Y5=Y5/100
+    Y_4=np.load('/home/florian/projet/scATACseq_KC.npz')['4'][0]
+    Y_4[Y_4 >= 20] = 20
+    Y_4=Y_4/20
 
-    Y_X=np.load('/home/florian/projet/scATACseq_14chr.npz')['X'][0]
-    Y_X[Y_X >= 100] = 100
-    Y_X=Y_X/100
+    Y_X=np.load('/home/florian/projet/scATACseq_KC.npz')['X'][0]
+    Y_X[Y_X >= 20] = 20
+    Y_X=Y_X/20
 
-    Y_Y=np.load('/home/florian/projet/scATACseq_14chr.npz')['Y'][0]
-    Y_Y[Y_Y >= 100] = 100
-    Y_Y=Y_Y/100
+    Y_Y=np.load('/home/florian/projet/scATACseq_KC.npz')['Y'][0]
+    Y_Y[Y_Y >= 20] = 20
+    Y_Y=Y_Y/20
 
     #generates homebrew weighted values
     x=np.concatenate((X_2R,X_3L))
@@ -160,10 +161,10 @@ if __name__ == "__main__":
     x_valid=X_3R
     y_valid=Y_3R
     batch_size = 2048
-    gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
+    gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**22)
     gen_valid = MyHbWeightedSequence(x_valid, y_valid, batch_size, max_data=2**14)
 
-    dir='/home/florian/projet/models/test_5/'
+    dir='/home/florian/projet/models/test_KC1/'
 
     #training with checkpoint saving
     print(tf.config.list_physical_devices())
@@ -172,7 +173,7 @@ if __name__ == "__main__":
                                                          save_weights_only=True,
                                                          verbose=1)
         early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='loss',patience=3,restore_best_weights=True)
-        history=model2.fit(gen,validation_data=gen_valid,epochs=100,verbose=1, callbacks=[cp_callback,early_stop_callback])
+        history=model2.fit(gen,validation_data=gen_valid,epochs=200,verbose=1, callbacks=[cp_callback,early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 

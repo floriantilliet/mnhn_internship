@@ -76,33 +76,33 @@ X_X=np.load('/home/florian/projet/r6.16/seq.npz')['X']
 X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 
 #create scATAC values for each chr
-Y_2L=np.load('/home/florian/projet/scATACseq_14chr.npz')['2L'][0]
-Y_2L[Y_2L >= 400] = 400
-Y_2L=Y_2L/400
+Y_2L=np.load('/home/florian/projet/scATACseq_KC.npz')['2L'][0]
+Y_2L[Y_2L >= 20] = 20
+Y_2L=Y_2L/20
 
-Y_2R=np.load('/home/florian/projet/scATACseq_14chr.npz')['2R'][0]
-Y_2R[Y_2R >= 400] = 400
-Y_2R=Y_2R/400
+Y_2R=np.load('/home/florian/projet/scATACseq_KC.npz')['2R'][0]
+Y_2R[Y_2R >= 20] = 20
+Y_2R=Y_2R/20
 
-Y_3L=np.load('/home/florian/projet/scATACseq_14chr.npz')['3L'][0]
-Y_3L[Y_3L >= 400] = 400
-Y_3L=Y_3L/400
+Y_3L=np.load('/home/florian/projet/scATACseq_KC.npz')['3L'][0]
+Y_3L[Y_3L >= 20] = 20
+Y_3L=Y_3L/20
 
-Y_3R=np.load('/home/florian/projet/scATACseq_14chr.npz')['3R'][0]
-Y_3R[Y_3R >= 400] = 400
-Y_3R=Y_3R/400
+Y_3R=np.load('/home/florian/projet/scATACseq_KC.npz')['3R'][0]
+Y_3R[Y_3R >= 20] = 20
+Y_3R=Y_3R/20
 
-Y_4=np.load('/home/florian/projet/scATACseq_14chr.npz')['4'][0]
-Y_4[Y_4 >= 400] = 400
-Y_4=Y_4/400
+Y_4=np.load('/home/florian/projet/scATACseq_KC.npz')['4'][0]
+Y_4[Y_4 >= 20] = 20
+Y_4=Y_4/20
 
-Y_X=np.load('/home/florian/projet/scATACseq_14chr.npz')['X'][0]
-Y_X[Y_X >= 400] = 400
-Y_X=Y_X/400
+Y_X=np.load('/home/florian/projet/scATACseq_KC.npz')['X'][0]
+Y_X[Y_X >= 20] = 20
+Y_X=Y_X/20
 
-Y_Y=np.load('/home/florian/projet/scATACseq_14chr.npz')['Y'][0]
-Y_Y[Y_Y >= 400] = 400
-Y_Y=Y_Y/400
+Y_Y=np.load('/home/florian/projet/scATACseq_KC.npz')['Y'][0]
+Y_Y[Y_Y >= 20] = 20
+Y_Y=Y_Y/20
 
 # #create data set for prediction
 # start, stop = 300_000, 310_000
@@ -162,7 +162,7 @@ class MyPredSequence(tf.keras.utils.Sequence):
         return batch_x
 
 
-model2.load_weights('/home/florian/projet/models/test_5/cp.cpkt')
+model2.load_weights('/home/florian/projet/models/test_KC1/cp.cpkt')
 
 X_chr2L=MyPredSequence(X_2L,1024)
 X_chr2R=MyPredSequence(X_2R,1024)
@@ -182,15 +182,15 @@ preds['predX']=model2.predict(X_chrX,batch_size=1024)
 preds['predY']=model2.predict(X_chrY,batch_size=1024)
 
 os.chdir('/home/florian/projet/models')
-np.savez_compressed('preds_test_5',**preds)
+np.savez_compressed('preds_test_KC1',**preds)
 
-pred2L=np.load('/home/florian/projet/models/preds_test_5.npz')['pred2L']
-pred2R=np.load('/home/florian/projet/models/preds_test_5.npz')['pred2R']
-pred3L=np.load('/home/florian/projet/models/preds_test_5.npz')['pred3L']
-pred3R=np.load('/home/florian/projet/models/preds_test_5.npz')['pred3R']
-pred4=np.load('/home/florian/projet/models/preds_test_5.npz')['pred4']
-predX=np.load('/home/florian/projet/models/preds_test_5.npz')['predX']
-predY=np.load('/home/florian/projet/models/preds_test_5.npz')['predY']
+pred2L=np.load('/home/florian/projet/models/preds_test_KC1.npz')['pred2L']
+pred2R=np.load('/home/florian/projet/models/preds_testKC1.npz')['pred2R']
+pred3L=np.load('/home/florian/projet/models/preds_test_KC1.npz')['pred3L']
+pred3R=np.load('/home/florian/projet/models/preds_test_KC1.npz')['pred3R']
+pred4=np.load('/home/florian/projet/models/preds_test_KC1.npz')['pred4']
+predX=np.load('/home/florian/projet/models/preds_test_KC1.npz')['predX']
+predY=np.load('/home/florian/projet/models/preds_test_KC1.npz')['predY']
 
 corr2L=np.corrcoef(Y_2L[1000:-1001],pred2L.ravel())[0][1]
 corr2R=np.corrcoef(Y_2R[1000:-1001],pred2R.ravel())[0][1]
