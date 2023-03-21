@@ -38,7 +38,7 @@ def mse_cor(y_true, y_pred):
     sigma_Y = K.sqrt(K.sum(Y*Y))
 
     cor = sigma_XY/(sigma_X*sigma_Y + K.epsilon())
-    mse = K.sqrt(K.mean(K.abs(y_true - y_pred)**2))
+    mse = K.mean((y_true - y_pred)**2)
 
     cor_mse=(1 - cor) + mse
     if tf.math.is_nan(cor_mse):
@@ -49,14 +49,14 @@ def mse_cor(y_true, y_pred):
 
 #create model
 model2 = tf.keras.models.Sequential([
-    tf.keras.layers.Conv1D(64, kernel_size=(5), activation='relu', input_shape=(8001,4)),
+    tf.keras.layers.Conv1D(64, kernel_size=(5), activation='relu', input_shape=(2001,4)),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Conv1D(32, kernel_size=(11), activation='relu'),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.Conv1D(16, kernel_size=(19), activation='relu'),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Flatten(),
     tf.keras.layers.Dense(8, activation='relu'),
     tf.keras.layers.Dense(1, activation="sigmoid")
@@ -125,7 +125,7 @@ X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 #generator for predictions
 class MyPredSequence(tf.keras.utils.Sequence):
 
-    def __init__(self, x_set, batch_size, WINDOW=8001):
+    def __init__(self, x_set, batch_size, WINDOW=2001):
         self.x = x_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
@@ -142,7 +142,7 @@ class MyPredSequence(tf.keras.utils.Sequence):
         return batch_x
 
 
-model2.load_weights('/home/florian/projet/models/test_window_8001/cp.cpkt')
+model2.load_weights('/home/florian/projet/models/test_latest_starting_point_2001/cp.cpkt')
 
 X_chr2L=MyPredSequence(X_2L,2048)
 X_chr2R=MyPredSequence(X_2R,2048)
@@ -153,13 +153,13 @@ X_chrX=MyPredSequence(X_X,2048)
 X_chrY=MyPredSequence(X_Y,2048)
 
 preds={}
-preds['pred2L']=np.concatenate((np.zeros(400),model2.predict(X_chr2L,batch_size=2048).ravel(),np.zeros(400)))
-preds['pred2R']=np.concatenate((np.zeros(400),model2.predict(X_chr2R,batch_size=2048).ravel(),np.zeros(400)))
-preds['pred3L']=np.concatenate((np.zeros(400),model2.predict(X_chr3L,batch_size=2048).ravel(),np.zeros(400)))
-preds['pred3R']=np.concatenate((np.zeros(400),model2.predict(X_chr3R,batch_size=2048).ravel(),np.zeros(400)))
-preds['pred4']=np.concatenate((np.zeros(400),model2.predict(X_chr4,batch_size=2048).ravel(),np.zeros(400)))
-preds['predX']=np.concatenate((np.zeros(400),model2.predict(X_chrX,batch_size=2048).ravel(),np.zeros(400)))
-preds['predY']=np.concatenate((np.zeros(400),model2.predict(X_chrY,batch_size=2048).ravel(),np.zeros(400)))
+preds['pred2L']=np.concatenate((np.zeros(100),model2.predict(X_chr2L,batch_size=2048).ravel(),np.zeros(100)))
+preds['pred2R']=np.concatenate((np.zeros(100),model2.predict(X_chr2R,batch_size=2048).ravel(),np.zeros(100)))
+preds['pred3L']=np.concatenate((np.zeros(100),model2.predict(X_chr3L,batch_size=2048).ravel(),np.zeros(100)))
+preds['pred3R']=np.concatenate((np.zeros(100),model2.predict(X_chr3R,batch_size=2048).ravel(),np.zeros(100)))
+preds['pred4']=np.concatenate((np.zeros(100),model2.predict(X_chr4,batch_size=2048).ravel(),np.zeros(100)))
+preds['predX']=np.concatenate((np.zeros(100),model2.predict(X_chrX,batch_size=2048).ravel(),np.zeros(100)))
+preds['predY']=np.concatenate((np.zeros(100),model2.predict(X_chrY,batch_size=2048).ravel(),np.zeros(100)))
 
 # preds={}
 # preds['pred2L']=model2.predict(X_chr2L,batch_size=2048).ravel()
@@ -171,6 +171,6 @@ preds['predY']=np.concatenate((np.zeros(400),model2.predict(X_chrY,batch_size=20
 # preds['predY']=model2.predict(X_chrY,batch_size=2048)
 
 os.chdir('/home/florian/projet/models')
-np.savez_compressed('preds_test_window_8001',**preds)
+np.savez_compressed('preds_test_latest_starting_point_2001',**preds)
 
 
