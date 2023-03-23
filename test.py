@@ -6,66 +6,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 import scipy.stats
+from keras.models import load_model
+from tensorflow import keras
 
-#cor_losses
-import keras.backend as K
-def mae_cor(y_true, y_pred):
-    """Compute loss with Mean absolute error and correlation.
-        :Example:
-        >>> model.compile(optimizer = 'adam', losses = mae_cor)
-        >>> load_model('file', custom_objects = {'mae_cor : mae_cor})
-    """
-    X = y_true - K.mean(y_true)
-    Y = y_pred - K.mean(y_pred)
+model_name='5_bins'
 
-    sigma_XY = K.sum(X*Y)
-    sigma_X = K.sqrt(K.sum(X*X))
-    sigma_Y = K.sqrt(K.sum(Y*Y))
-
-    cor = sigma_XY/(sigma_X*sigma_Y + K.epsilon())
-    mae = K.mean(K.abs(y_true - y_pred))
-
-    return (1 - cor) + mae
-
-def mse_cor(y_true, y_pred):
-    """Compute loss with Mean squared error and correlation.
-    """
-    X = y_true - K.mean(y_true)
-    Y = y_pred - K.mean(y_pred)
-
-    sigma_XY = K.sum(X*Y)
-    sigma_X = K.sqrt(K.sum(X*X))
-    sigma_Y = K.sqrt(K.sum(Y*Y))
-
-    cor = sigma_XY/(sigma_X*sigma_Y + K.epsilon())
-    mse = K.mean((y_true - y_pred)**2)
-
-    cor_mse=(1 - cor) + mse
-    if tf.math.is_nan(cor_mse):
-        print(X,Y)
-        print('oui')
-
-    return cor_mse
-
-#create model
-model2 = tf.keras.models.Sequential([
-    tf.keras.layers.Conv1D(64, kernel_size=(5), activation='relu', input_shape=(2001,4)),
-    tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.BatchNormalization(),
-    tf.keras.layers.Conv1D(32, kernel_size=(11), activation='relu'),
-    tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.Conv1D(16, kernel_size=(19), activation='relu'),
-    tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.BatchNormalization(),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(8, activation='relu'),
-    tf.keras.layers.Dense(1, activation="sigmoid")
-    ])
-
-model2.compile(loss=mse_cor,
-    optimizer='adam',
-    metrics=['mae'],
-    run_eagerly=True)
+model2 = load_model('/home/florian/projet/models/'+ model_name +'/'+ model_name+ '.h5', compile=False)
 
 # get all chr
 X_2L=np.load('/home/florian/projet/r6.16/seq.npz')['2L']
@@ -141,9 +87,6 @@ class MyPredSequence(tf.keras.utils.Sequence):
         batch_x = self.x[window_indices]
         return batch_x
 
-
-model2.load_weights('/home/florian/projet/models/test_latest_starting_point_2001/cp.cpkt')
-
 X_chr2L=MyPredSequence(X_2L,2048)
 X_chr2R=MyPredSequence(X_2R,2048)
 X_chr3L=MyPredSequence(X_3L,2048)
@@ -171,6 +114,6 @@ preds['predY']=np.concatenate((np.zeros(100),model2.predict(X_chrY,batch_size=20
 # preds['predY']=model2.predict(X_chrY,batch_size=2048)
 
 os.chdir('/home/florian/projet/models')
-np.savez_compressed('preds_test_latest_starting_point_2001',**preds)
+np.savez_compressed('preds_'+model_name,**preds)
 
 

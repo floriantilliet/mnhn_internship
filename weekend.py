@@ -170,10 +170,7 @@ os.chdir('/home/florian/projet/cell_types')
 #fichiers=os.listdir('/home/florian/projet/cell_types')
 
 
-fichiers=['scATACseq_T3.dedup.no_blacklist.RPGCnormalized.bw.npz',
- 'scATACseq_KC_AB.dedup.no_blacklist.RPGCnormalized.bw.npz',
- 'scATACseq_T1.dedup.no_blacklist.RPGCnormalized.bw.npz',
- 'scATACseq_Ensheathingglia.dedup.no_blacklist.RPGCnormalized.bw.npz',
+fichiers=['scATACseq_Ensheathingglia.dedup.no_blacklist.RPGCnormalized.bw.npz',
  'scATACseq_T2.dedup.no_blacklist.RPGCnormalized.bw.npz',
  'scATACseq_KC_G.dedup.no_blacklist.RPGCnormalized.bw.npz',
  'scATACseq_KC_ABp.dedup.no_blacklist.RPGCnormalized.bw.npz']
