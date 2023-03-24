@@ -8,6 +8,8 @@ import scipy as sp
 import matplotlib.pyplot as plt
 import scipy.stats
 import pandas as pd
+from keras.models import load_model
+from tensorflow import keras
 
 
 #generator weighted homebrew (new weights each batch) without Ns
@@ -164,69 +166,29 @@ if __name__ == "__main__":
         metrics=['mae'],
         run_eagerly=True)
 
-    #get all chr and their respective lenghts
-    # X_2L=np.load('/home/florian/projet/r6.16/seq.npz')['2L']
-    # X_2R=np.load('/home/florian/projet/r6.16/seq.npz')['2R']
-    # X_3L=np.load('/home/florian/projet/r6.16/seq.npz')['3L']
-    # X_3R=np.load('/home/florian/projet/r6.16/seq.npz')['3R']
-    # X_4=np.load('/home/florian/projet/r6.16/seq.npz')['4']
-    # X_X=np.load('/home/florian/projet/r6.16/seq.npz')['X']
-    # X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
-
-    with np.load('/home/florian/projet/r6.16/seq.npz') as f:
-        X_2L = f['2L']
-        X_2R = f['2R']
-        X_3L = f['3L']
-        X_3R = f['3R']
-        X_4 = f['4']
-        X_X = f['X']
-        X_Y = f['Y']
+    dicX = {}
+    with np.load('/home/florian/projet/W303/seq.npz') as f:
+        for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16"]:
+            dicX['{}'.format(i)]=f['chr{}'.format(i)]
 
     #create scATAC values for each chr
-
-    with np.load('/home/florian/projet/scATACseq_14chr.npz') as f:
-        Y_2L=f['2L'][0]
-        Y_2R=f['2R'][0]
-        Y_3L=f['3L'][0]
-        Y_3R=f['3R'][0]
-        Y_4=f['4'][0]
-        Y_X=f['X'][0]
-        Y_Y=f['Y'][0]
-
-    cut=100
-    Y_2L[Y_2L >= cut] = cut
-    Y_2L=Y_2L/cut
-
-    Y_2R[Y_2R >= cut] = cut
-    Y_2R=Y_2R/cut
-
-    Y_3L[Y_3L >= cut] = cut
-    Y_3L=Y_3L/cut
-
-    Y_3R[Y_3R >= cut] = cut
-    Y_3R=Y_3R/cut
-
-    Y_4[Y_4 >= cut] = cut
-    Y_4=Y_4/cut
-
-    Y_X[Y_X >= cut] = cut
-    Y_X=Y_X/cut
-
-    Y_Y[Y_Y >= 30] = 30
-    Y_Y=Y_Y/30
+    dicY = {}
+    with np.load('/home/florian/clipped99_MNase.npz') as f:
+        for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16"]:
+            dicY['{}'.format(i)]=f['chr{}'.format(i)]
 
     #generates homebrew weighted values
-    x=np.concatenate((X_2L,X_4,X_3R))
-    y=np.concatenate((Y_2L,Y_4,Y_3R))
-    x_valid=X_2R
-    y_valid=Y_2R
+    x=np.concatenate((dicX['04'],dicX['07'],dicX['12']))
+    y=np.concatenate((dicY['04'],dicY['07'],dicY['12']))
+    x_valid=dicX['15']
+    y_valid=dicY['15']
     batch_size = 1024
-    gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
-    gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**15)
+    gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**10)
+    gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**5)
 
-    model_name='mse_only3'
+    model_name='test'
 
-    dir='/home/florian/projet/models/' + model_name + '/'
+    dir='/home/florian/projet/models_yeast/' + model_name + '/'
 
     #training with checkpoint saving
     print(tf.config.list_physical_devices())
@@ -235,7 +197,7 @@ if __name__ == "__main__":
                                                          verbose=1)
         early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=15,restore_best_weights=True)
         # RL_callback=tf.keras.callbacks.ReduceLROnPlateau(patience=3)
-        history=model2.fit(gen,validation_data=gen_valid,epochs=50,verbose=1, callbacks=[cp_callback,early_stop_callback])
+        history=model2.fit(gen,validation_data=gen_valid,epochs=100,verbose=1, callbacks=[cp_callback,early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
@@ -249,3 +211,37 @@ if __name__ == "__main__":
 
     model2.save(model_name + '.h5')  # creates a HDF5 file 'my_model.h5'
     del model2
+
+model2 = load_model('/home/florian/projet/models_yeast/'+ model_name +'/'+ model_name+ '.h5', compile=False)
+
+#generator for predictions
+class MyPredSequence(tf.keras.utils.Sequence):
+
+    def __init__(self, x_set, batch_size, WINDOW=2001):
+        self.x = x_set
+        self.batch_size = batch_size
+        self.WINDOW = WINDOW
+        self.indices = np.arange(len(self.x))
+        self.indices=self.indices[self.WINDOW//2:len(self.x)-self.WINDOW//2 -1][::10]
+
+    def __len__(self):
+        return int(np.ceil(len(self.indices) / self.batch_size))
+
+    def __getitem__(self, idx):
+        batch_indices = self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
+        window_indices = batch_indices.reshape(-1, 1) + np.arange(-(self.WINDOW//2), self.WINDOW//2 + 1).reshape(1, -1)
+        batch_x = self.x[window_indices]
+        return batch_x
+
+genX={}
+for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16"]:
+    genX["{}".format(i)]=MyPredSequence(dicX['{}'.format(i)],2048)
+
+preds={}
+for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16"]:
+    preds["{}".format(i)]=np.concatenate((np.zeros(100),model2.predict(genX["{}".format(i)],batch_size=2048).ravel(),np.zeros(100)))
+
+
+os.chdir('/home/florian/projet/models_yeast')
+np.savez_compressed('preds_'+model_name,**preds)
+
