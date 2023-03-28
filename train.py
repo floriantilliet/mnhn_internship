@@ -17,7 +17,7 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
         self.x, self.y = x_set, y_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
-        
+
         self.max_data = max_data
         # bin_values, bin_edges = np.histogram(self.y, bins=1000)
         # bin_indices = np.digitize(self.y, bin_edges)
@@ -55,7 +55,7 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
         bin_indices[bin_indices == 1000+1] = 1000
         bin_indices -= 1
         batch_weights = batch_size / (1000 * bin_values[bin_indices])
-        return batch_x, batch_y, batch_weights
+        return batch_x, batch_y#, batch_weights
         
     def on_epoch_end(self):
         self.indices = np.random.choice(self.indices, size=self.max_data, replace=False)
@@ -99,7 +99,7 @@ class MyValidSequence(tf.keras.utils.Sequence):
         # bin_indices[bin_indices == 1001] = 1000
         # bin_indices -= 1
         # batch_weights = batch_size / (1000 * bin_values[bin_indices])
-        return batch_x, batch_y, batch_weights
+        return batch_x, batch_y#, batch_weights
 
 
 #cor_losses
@@ -193,7 +193,7 @@ if __name__ == "__main__":
         Y_X=f['X'][0]
         Y_Y=f['Y'][0]
 
-    cut=100
+    cut=500
     Y_2L[Y_2L >= cut] = cut
     Y_2L=Y_2L/cut
 
@@ -212,8 +212,8 @@ if __name__ == "__main__":
     Y_X[Y_X >= cut] = cut
     Y_X=Y_X/cut
 
-    Y_Y[Y_Y >= 30] = 30
-    Y_Y=Y_Y/30
+    Y_Y[Y_Y >= 80] = 80
+    Y_Y=Y_Y/80
 
     #generates homebrew weighted values
     x=np.concatenate((X_2L,X_4,X_3R))
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
     gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**15)
 
-    model_name='mse_only3'
+    model_name='new_cut_weightless'
 
     dir='/home/florian/projet/models/' + model_name + '/'
 

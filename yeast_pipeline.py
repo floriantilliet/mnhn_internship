@@ -19,7 +19,6 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
         self.x, self.y = x_set, y_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
-        
         self.max_data = max_data
         # bin_values, bin_edges = np.histogram(self.y, bins=1000)
         # bin_indices = np.digitize(self.y, bin_edges)
@@ -37,6 +36,7 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
         self.indices = self.indices[(Bases_loc==0) & (self.y!=0)]
         self.indices=np.clip(self.indices,self.WINDOW//2,len(self.x)-self.WINDOW//2 -1)
         self.indices=np.unique(self.indices)
+        print(len(self.indices))
         # self.indices=self.indices[:self.max_data:]
         self.on_epoch_end()
         # self.indices = np.random.choice(self.indices, size=self.max_data, replace=False)
@@ -56,7 +56,7 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
         bin_indices = np.digitize(batch_y, bin_edges)
         bin_indices[bin_indices == 1000+1] = 1000
         bin_indices -= 1
-        batch_weights = batch_size / (1000 * bin_values[bin_indices])
+        batch_weights = self.batch_size / (1000 * bin_values[bin_indices])
         return batch_x, batch_y, batch_weights
         
     def on_epoch_end(self):
@@ -100,9 +100,13 @@ class MyValidSequence(tf.keras.utils.Sequence):
         # bin_indices = np.digitize(batch_y, bin_edges)
         # bin_indices[bin_indices == 1001] = 1000
         # bin_indices -= 1
-        # batch_weights = batch_size / (1000 * bin_values[bin_indices])
+        # batch_weights = self.batch_size / (1000 * bin_values[bin_indices])
         return batch_x, batch_y, batch_weights
 
+
+def smooth(x,window):
+    a=np.convolve(x, np.ones(window)/window, mode='valid')
+    return(np.concatenate((np.zeros((window)//2),a,np.zeros((window)//2-1))))
 
 #cor_losses
 import keras.backend as K
@@ -175,18 +179,18 @@ if __name__ == "__main__":
     dicY = {}
     with np.load('/home/florian/clipped99_MNase.npz') as f:
         for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16"]:
-            dicY['{}'.format(i)]=f['chr{}'.format(i)]
+            dicY['{}'.format(i)]=smooth(f['chr{}'.format(i)],50)
 
     #generates homebrew weighted values
-    x=np.concatenate((dicX['04'],dicX['07'],dicX['12']))
-    y=np.concatenate((dicY['04'],dicY['07'],dicY['12']))
+    x=np.concatenate((dicX['04'],dicX['07']))
+    y=np.concatenate((dicY['04'],dicY['07']))
     x_valid=dicX['15']
     y_valid=dicY['15']
     batch_size = 1024
-    gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**10)
+    gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**17)
     gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**5)
 
-    model_name='test'
+    model_name='test_new'
 
     dir='/home/florian/projet/models_yeast/' + model_name + '/'
 
@@ -195,12 +199,12 @@ if __name__ == "__main__":
     with tf.device('/GPU:0'):
         cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath= dir+'cp.cpkt',
                                                          verbose=1)
-        early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=15,restore_best_weights=True)
-        # RL_callback=tf.keras.callbacks.ReduceLROnPlateau(patience=3)
+        early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=25,restore_best_weights=True)
+        # LR_callback=tf.keras.callbacks.ReduceLROnPlateau(patience=3)
         history=model2.fit(gen,validation_data=gen_valid,epochs=100,verbose=1, callbacks=[cp_callback,early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
-    hist_df = pd.DataFrame(history.history) 
+    hist_df = pd.DataFrame(history.history)
 
     os.chdir(dir)
 
@@ -240,7 +244,6 @@ for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14",
 preds={}
 for i in ["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16"]:
     preds["{}".format(i)]=np.concatenate((np.zeros(100),model2.predict(genX["{}".format(i)],batch_size=2048).ravel(),np.zeros(100)))
-
 
 os.chdir('/home/florian/projet/models_yeast')
 np.savez_compressed('preds_'+model_name,**preds)

@@ -9,7 +9,7 @@ import scipy.stats
 from keras.models import load_model
 from tensorflow import keras
 
-model_name='mse_only3'
+model_name='new_cut_weightless'
 
 model2 = load_model('/home/florian/projet/models/'+ model_name +'/'+ model_name+ '.h5', compile=False)
 
