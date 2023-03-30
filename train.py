@@ -13,7 +13,7 @@ import pandas as pd
 #generator weighted homebrew (new weights each batch) without Ns
 class MyHbWeightedSequence(tf.keras.utils.Sequence):
 
-    def __init__(self, x_set, y_set, batch_size, max_data=2**20, WINDOW=2001,bin=1000):
+    def __init__(self, x_set, y_set, batch_size, max_data=2**20, WINDOW=501,bin=1000):
         self.x, self.y = x_set, y_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
@@ -64,7 +64,7 @@ class MyHbWeightedSequence(tf.keras.utils.Sequence):
 #gen validation
 class MyValidSequence(tf.keras.utils.Sequence):
 
-    def __init__(self, x_set, y_set, batch_size, max_data=2**20, WINDOW=2001,bin=1000):
+    def __init__(self, x_set, y_set, batch_size, max_data=2**20, WINDOW=501,bin=1000):
         self.x, self.y = x_set, y_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
@@ -146,7 +146,7 @@ def mse_cor(y_true, y_pred):
 
 if __name__ == "__main__":
     model2 = tf.keras.models.Sequential([
-        tf.keras.layers.Conv1D(64, kernel_size=(5), activation='relu', input_shape=(2001,4)),
+        tf.keras.layers.Conv1D(64, kernel_size=(5), activation='relu', input_shape=(501,4)),
         tf.keras.layers.MaxPooling1D(pool_size=(2)),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Conv1D(32, kernel_size=(11), activation='relu'),
@@ -220,11 +220,11 @@ if __name__ == "__main__":
     y=np.concatenate((Y_2L,Y_4,Y_3R))
     x_valid=X_2R
     y_valid=Y_2R
-    batch_size = 1024
+    batch_size = 256
     gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
     gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**15)
 
-    model_name='new_cut_weightless'
+    model_name='new_cut_weightless_501bp'
 
     dir='/home/florian/projet/models/' + model_name + '/'
 
