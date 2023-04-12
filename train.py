@@ -160,7 +160,7 @@ if __name__ == "__main__":
         ])
 
     model2.compile(loss='mse',
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001),
         metrics=['mae'],
         run_eagerly=True)
 
@@ -224,7 +224,7 @@ if __name__ == "__main__":
     gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
     gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**15)
 
-    model_name='new_cut_weightless_501bp'
+    model_name='new_cut_10LR'
 
     dir='/home/florian/projet/models/' + model_name + '/'
 

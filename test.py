@@ -9,7 +9,7 @@ import scipy.stats
 from keras.models import load_model
 from tensorflow import keras
 
-model_name='new_cut_weightless_501bp'
+model_name='new_cut_10LR'
 
 model2 = load_model('/home/florian/projet/models/'+ model_name +'/'+ model_name+ '.h5', compile=False)
 
@@ -65,15 +65,6 @@ preds['pred3R']=np.concatenate((np.zeros(25),model2.predict(X_chr3R,batch_size=2
 preds['pred4']=np.concatenate((np.zeros(25),model2.predict(X_chr4,batch_size=256).ravel(),np.zeros(25)))
 preds['predX']=np.concatenate((np.zeros(25),model2.predict(X_chrX,batch_size=256).ravel(),np.zeros(25)))
 preds['predY']=np.concatenate((np.zeros(25),model2.predict(X_chrY,batch_size=256).ravel(),np.zeros(25)))
-
-# preds={}
-# preds['pred2L']=model2.predict(X_chr2L,batch_size=256).ravel()
-# preds['pred2R']=model2.predict(X_chr2R,batch_size=256)
-# preds['pred3L']=model2.predict(X_chr3L,batch_size=256)
-# preds['pred3R']=model2.predict(X_chr3R,batch_size=256)
-# preds['pred4']=model2.predict(X_chr4,batch_size=256)
-# preds['predX']=model2.predict(X_chrX,batch_size=256)
-# preds['predY']=model2.predict(X_chrY,batch_size=256)
 
 os.chdir('/home/florian/projet/models')
 np.savez_compressed('preds_'+model_name,**preds)
