@@ -164,15 +164,6 @@ if __name__ == "__main__":
         metrics=['mae'],
         run_eagerly=True)
 
-    #get all chr and their respective lenghts
-    # X_2L=np.load('/home/florian/projet/r6.16/seq.npz')['2L']
-    # X_2R=np.load('/home/florian/projet/r6.16/seq.npz')['2R']
-    # X_3L=np.load('/home/florian/projet/r6.16/seq.npz')['3L']
-    # X_3R=np.load('/home/florian/projet/r6.16/seq.npz')['3R']
-    # X_4=np.load('/home/florian/projet/r6.16/seq.npz')['4']
-    # X_X=np.load('/home/florian/projet/r6.16/seq.npz')['X']
-    # X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
-
     with np.load('/home/florian/projet/r6.16/seq.npz') as f:
         X_2L = f['2L']
         X_2R = f['2R']

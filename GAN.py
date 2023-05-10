@@ -58,8 +58,10 @@ discriminator = keras.Sequential(
     name="discriminator",
 )
 
+latent_dim=10
+
 generator= tf.keras.models.Sequential([
-        keras.Input(shape=(1)),
+        keras.Input(shape=(latent_dim)),
         tf.keras.layers.Dense(10, activation='relu'),
         tf.keras.layers.Dense((40000), activation="relu"),
         tf.keras.layers.Reshape((10000,4)),
@@ -84,7 +86,7 @@ generator= tf.keras.models.Sequential([
 #     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
 #     ])
 
-latent_dim=1
+
 
 class GAN(keras.Model):
     def __init__(self, discriminator, generator, latent_dim):
@@ -172,7 +174,7 @@ with tf.device('/GPU:0'):
 
 # print(history.history)
 
-model_name='sigmoid'
+model_name='latent_dim10'
 
 os.chdir('/home/florian/projet/generators')
 generator.save(model_name + '.h5')  # creates a HDF5 file 'my_model.h5'
