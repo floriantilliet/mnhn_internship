@@ -3,38 +3,88 @@ from tensorflow import keras
 from keras import layers
 from keras.models import load_model
 import numpy as np
+import os
+import pandas as pd
 
-# Create the discriminator
+with np.load('/home/florian/projet/r6.16/seq.npz') as f:
+    X_2L = f['2L']
+    X_2R = f['2R']
+    X_3L = f['3L']
+    X_3R = f['3R']
+    X_4 = f['4']
+    X_X = f['X']
+    X_Y = f['Y']
+
+class SequenceFeeder(tf.keras.utils.Sequence):
+
+    def __init__(self, x_set, batch_size, max_data=2**20, WINDOW=10000):
+        self.x = x_set
+        self.batch_size = batch_size
+        self.WINDOW = WINDOW
+
+        self.max_data = max_data
+        # n_data = min(len(self.x)-self.WINDOW, max_data)
+        self.indices = np.arange(max_data)
+        # self.indices = np.random.choice(self.indices, size=max_data, replace=False)
+        # self.indices=np.clip(self.indices,self.WINDOW//2,len(self.x)-self.WINDOW//2 -1)
+        # self.indices=np.unique(self.indices)
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(len(self.indices) / self.batch_size))
+
+    def __getitem__(self, idx):
+        batch_indices = self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
+        window_indices = batch_indices.reshape(-1, 1) + np.arange(-(self.WINDOW//2), self.WINDOW//2).reshape(1, -1)
+        batch_x = self.x[window_indices]
+        return batch_x 
+        
+    def on_epoch_end(self):
+        self.indices = np.random.choice(self.indices, size=self.max_data, replace=False)
+        np.random.shuffle(self.indices)
+
+# model_name='new_cut_2001_KC_G'
+# predictor = load_model('/home/florian/projet/models/'+ model_name +'/'+ model_name+ '.h5', compile=False)
+
 discriminator = keras.Sequential(
     [
-        keras.Input(shape=(28, 28, 1)),
-        layers.Conv2D(64, (3, 3), strides=(2, 2), padding="same"),
+        layers.Conv1D(64, kernel_size=(5), input_shape=(10000,4)),
         layers.LeakyReLU(alpha=0.2),
-        layers.Conv2D(128, (3, 3), strides=(2, 2), padding="same"),
+        layers.Conv1D(32, kernel_size=(11)),
         layers.LeakyReLU(alpha=0.2),
-        layers.GlobalMaxPooling2D(),
-        layers.Dense(1),
+        layers.GlobalMaxPooling1D(),
+        layers.Dense(1),#,activation="sigmoid"),
     ],
     name="discriminator",
 )
 
-# Create the generator
-latent_dim = 128
-generator = keras.Sequential(
-    [
-        keras.Input(shape=(latent_dim,)),
-        # We want to generate 128 coefficients to reshape into a 7x7x128 map
-        layers.Dense(7 * 7 * 128),
-        layers.LeakyReLU(alpha=0.2),
-        layers.Reshape((7, 7, 128)),
-        layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding="same"),
-        layers.LeakyReLU(alpha=0.2),
-        layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding="same"),
-        layers.LeakyReLU(alpha=0.2),
-        layers.Conv2D(1, (7, 7), padding="same", activation="sigmoid"),
-    ],
-    name="generator",
-)
+generator= tf.keras.models.Sequential([
+        keras.Input(shape=(1)),
+        tf.keras.layers.Dense(10, activation='relu'),
+        tf.keras.layers.Dense((40000), activation="relu"),
+        tf.keras.layers.Reshape((10000,4)),
+        tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+        ])
+
+# generator = tf.keras.models.Sequential([
+#     keras.Input(shape=(1)),
+#     tf.keras.layers.Dense(200*4, activation='relu'),
+#     tf.keras.layers.Reshape((200,4)),
+#     tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
+#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
+#     tf.keras.layers.BatchNormalization(),
+#     tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
+#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
+#     tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
+#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
+#     tf.keras.layers.BatchNormalization(),
+#     tf.keras.layers.Flatten(),
+#     tf.keras.layers.Dense((40000), activation="relu"),
+#     tf.keras.layers.Reshape((10000,4)),
+#     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+#     ])
+
+latent_dim=1
 
 class GAN(keras.Model):
     def __init__(self, discriminator, generator, latent_dim):
@@ -49,20 +99,18 @@ class GAN(keras.Model):
         self.g_optimizer = g_optimizer
         self.loss_fn = loss_fn
 
-    def train_step(self, real_images):
-        if isinstance(real_images, tuple):
-            real_images = real_images[0]
+    def train_step(self, real_sequences):
         # Sample random points in the latent space
-        batch_size = tf.shape(real_images)[0]
+        batch_size = tf.shape(real_sequences)[0]
         random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
 
-        # Decode them to fake images
-        generated_images = self.generator(random_latent_vectors)
+        # Decode them to fake sequences
+        generated_sequences = self.generator(random_latent_vectors)
 
-        # Combine them with real images
-        combined_images = tf.concat([generated_images, real_images], axis=0)
+        # Combine them with real sequences
+        combined_sequences = tf.concat([generated_sequences, real_sequences], axis=0)
 
-        # Assemble labels discriminating real from fake images
+        # Assemble labels discriminating real from fake sequences
         labels = tf.concat(
             [tf.ones((batch_size, 1)), tf.zeros((batch_size, 1))], axis=0
         )
@@ -71,7 +119,7 @@ class GAN(keras.Model):
 
         # Train the discriminator
         with tf.GradientTape() as tape:
-            predictions = self.discriminator(combined_images)
+            predictions = self.discriminator(combined_sequences)
             d_loss = self.loss_fn(labels, predictions)
         grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
         self.d_optimizer.apply_gradients(
@@ -81,7 +129,7 @@ class GAN(keras.Model):
         # Sample random points in the latent space
         random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
 
-        # Assemble labels that say "all real images"
+        # Assemble labels that say "all real sequences"
         misleading_labels = tf.zeros((batch_size, 1))
 
         # Train the generator (note that we should *not* update the weights
@@ -91,24 +139,45 @@ class GAN(keras.Model):
             g_loss = self.loss_fn(misleading_labels, predictions)
         grads = tape.gradient(g_loss, self.generator.trainable_weights)
         self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
-        return {"d_loss": d_loss, "g_loss": g_loss}
+        return {"d_loss":d_loss, "g_loss":g_loss}
 
+# To limit the execution time, we only train on 100 batches. You can train on
+# the entire dataset. You will need about 20 epochs to get nice results.
 # Prepare the dataset. We use both the training & test MNIST digits.
-batch_size = 64
-(x_train, _), (x_test, _) = keras.datasets.mnist.load_data()
-all_digits = np.concatenate([x_train, x_test])
-all_digits = all_digits.astype("float32") / 255.0
-all_digits = np.reshape(all_digits, (-1, 28, 28, 1))
-dataset = tf.data.Dataset.from_tensor_slices(all_digits)
-dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
+
+batch_size = 256
+x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**18)
+# x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
+
+# all_digits = np.concatenate([x_train, x_test])
+
+# dataset = tf.data.Dataset.from_tensor_slices(all_digits)
+# dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
 
 gan = GAN(discriminator=discriminator, generator=generator, latent_dim=latent_dim)
 gan.compile(
     d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
-    loss_fn=keras.losses.BinaryCrossentropy(from_logits=True),
+    # loss_fn=keras.losses.MAE
+    loss_fn = keras.losses.BinaryCrossentropy(from_logits=True)
 )
 
-# To limit the execution time, we only train on 100 batches. You can train on
-# the entire dataset. You will need about 20 epochs to get nice results.
-gan.fit(dataset.take(100), epochs=1)
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=15,restore_best_weights=True)
+
+with tf.device('/GPU:0'):
+    history=gan.fit(x_train, epochs=20)#,callbacks=[early_stop_callback])
+
+    # convert the history.history dict to a pandas DataFrame:     
+    hist_df = pd.DataFrame(history.history) 
+
+# print(history.history)
+
+model_name='sigmoid'
+
+os.chdir('/home/florian/projet/generators')
+generator.save(model_name + '.h5')  # creates a HDF5 file 'my_model.h5'
+
+# save to csv: 
+hist_csv_file = model_name+'history.csv'
+with open(hist_csv_file, mode='w') as f:
+    hist_df.to_csv(f)
