@@ -60,31 +60,31 @@ discriminator = keras.Sequential(
 
 latent_dim=10
 
-generator= tf.keras.models.Sequential([
-        keras.Input(shape=(latent_dim)),
-        tf.keras.layers.Dense(10, activation='relu'),
-        tf.keras.layers.Dense((40000), activation="relu"),
-        tf.keras.layers.Reshape((10000,4)),
-        tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
-        ])
+# generator= tf.keras.models.Sequential([
+#         keras.Input(shape=(latent_dim)),
+#         tf.keras.layers.Dense(10, activation='relu'),
+#         tf.keras.layers.Dense((40000), activation="relu"),
+#         tf.keras.layers.Reshape((10000,4)),
+#         tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+#         ])
 
-# generator = tf.keras.models.Sequential([
-#     keras.Input(shape=(1)),
-#     tf.keras.layers.Dense(200*4, activation='relu'),
-#     tf.keras.layers.Reshape((200,4)),
-#     tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
-#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
-#     tf.keras.layers.BatchNormalization(),
-#     tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
-#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
-#     tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
-#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
-#     tf.keras.layers.BatchNormalization(),
-#     tf.keras.layers.Flatten(),
-#     tf.keras.layers.Dense((40000), activation="relu"),
-#     tf.keras.layers.Reshape((10000,4)),
-#     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
-#     ])
+generator = tf.keras.models.Sequential([
+    keras.Input(shape=(latent_dim)),
+    tf.keras.layers.Dense(200*4, activation='relu'),
+    tf.keras.layers.Reshape((200,4)),
+    tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
+    tf.keras.layers.MaxPooling1D(pool_size=(2)),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
+    tf.keras.layers.MaxPooling1D(pool_size=(2)),
+    tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
+    tf.keras.layers.MaxPooling1D(pool_size=(2)),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense((40000), activation="relu"),
+    tf.keras.layers.Reshape((10000,4)),
+    tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+    ])
 
 
 
@@ -164,17 +164,17 @@ gan.compile(
     loss_fn = keras.losses.BinaryCrossentropy(from_logits=True)
 )
 
-early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss',patience=15,restore_best_weights=True)
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience=3, min_delta=10, mode="max",restore_best_weights=True)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=20)#,callbacks=[early_stop_callback])
+    history=gan.fit(x_train, epochs=100,callbacks=[early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
 
 # print(history.history)
 
-model_name='latent_dim10'
+model_name='latentdim10_CNN_40epochs_earlystop'
 
 os.chdir('/home/florian/projet/generators')
 generator.save(model_name + '.h5')  # creates a HDF5 file 'my_model.h5'
