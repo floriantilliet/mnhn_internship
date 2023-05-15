@@ -24,7 +24,7 @@ class SequenceFeeder(tf.keras.utils.Sequence):
 
         self.max_data = max_data
         # n_data = min(len(self.x)-self.WINDOW, max_data)
-        self.indices = np.arange(max_data)
+        self.all_indices = np.arange(len(x_set) - WINDOW + 1)
         # self.indices = np.random.choice(self.indices, size=max_data, replace=False)
         # self.indices=np.clip(self.indices,self.WINDOW//2,len(self.x)-self.WINDOW//2 -1)
         # self.indices=np.unique(self.indices)
@@ -35,13 +35,13 @@ class SequenceFeeder(tf.keras.utils.Sequence):
 
     def __getitem__(self, idx):
         batch_indices = self.indices[idx*self.batch_size:(idx+1)*self.batch_size]
-        window_indices = batch_indices.reshape(-1, 1) + np.arange(-(self.WINDOW//2), self.WINDOW//2).reshape(1, -1)
+        window_indices = batch_indices.reshape(-1, 1) + np.arange(self.WINDOW).reshape(1, -1)
         batch_x = self.x[window_indices]
         return batch_x 
         
     def on_epoch_end(self):
-        self.indices = np.random.choice(self.indices, size=self.max_data, replace=False)
-        np.random.shuffle(self.indices)
+        self.indices = np.random.choice(self.all_indices, size=self.max_data, replace=False)
+        # np.random.shuffle(self.indices)
 
 # model_name='new_cut_2001_KC_G'
 # predictor = load_model('/home/florian/projet/models/'+ model_name +'/'+ model_name+ '.h5', compile=False)
@@ -53,7 +53,7 @@ discriminator = keras.Sequential(
         layers.Conv1D(32, kernel_size=(11)),
         layers.LeakyReLU(alpha=0.2),
         layers.GlobalMaxPooling1D(),
-        layers.Dense(1),#,activation="sigmoid"),
+        layers.Dense(1,activation="sigmoid"),
     ],
     name="discriminator",
 )
@@ -94,6 +94,7 @@ class GAN(keras.Model):
         self.discriminator = discriminator
         self.generator = generator
         self.latent_dim = latent_dim
+        self.g_steps_per_d_step = 3
 
     def compile(self, d_optimizer, g_optimizer, loss_fn):
         super(GAN, self).compile()
@@ -116,8 +117,8 @@ class GAN(keras.Model):
         labels = tf.concat(
             [tf.ones((batch_size, 1)), tf.zeros((batch_size, 1))], axis=0
         )
-        # Add random noise to the labels - important trick!
-        labels += 0.05 * tf.random.uniform(tf.shape(labels))
+        # # Add random noise to the labels - important trick!
+        # labels += 0.05 * tf.random.uniform(tf.shape(labels))
 
         # Train the discriminator
         with tf.GradientTape() as tape:
@@ -128,19 +129,20 @@ class GAN(keras.Model):
             zip(grads, self.discriminator.trainable_weights)
         )
 
-        # Sample random points in the latent space
-        random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
+        for i in range(self.g_steps_per_d_step):
+            # Sample random points in the latent space
+            random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
 
-        # Assemble labels that say "all real sequences"
-        misleading_labels = tf.zeros((batch_size, 1))
+            # Assemble labels that say "all real sequences"
+            misleading_labels = tf.zeros((batch_size, 1))
 
-        # Train the generator (note that we should *not* update the weights
-        # of the discriminator)!
-        with tf.GradientTape() as tape:
-            predictions = self.discriminator(self.generator(random_latent_vectors))
-            g_loss = self.loss_fn(misleading_labels, predictions)
-        grads = tape.gradient(g_loss, self.generator.trainable_weights)
-        self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
+            # Train the generator (note that we should *not* update the weights
+            # of the discriminator)!
+            with tf.GradientTape() as tape:
+                predictions = self.discriminator(self.generator(random_latent_vectors))
+                g_loss = self.loss_fn(misleading_labels, predictions)
+            grads = tape.gradient(g_loss, self.generator.trainable_weights)
+            self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
 
 # To limit the execution time, we only train on 100 batches. You can train on
@@ -158,27 +160,27 @@ x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data
 
 gan = GAN(discriminator=discriminator, generator=generator, latent_dim=latent_dim)
 gan.compile(
-    d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
-    g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
+    d_optimizer=keras.optimizers.Adam(learning_rate=0.0005),
+    g_optimizer=keras.optimizers.Adam(learning_rate=0.0001),
     # loss_fn=keras.losses.MAE
-    loss_fn = keras.losses.BinaryCrossentropy(from_logits=True)
+    loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
 )
 
-early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience=3, min_delta=10, mode="max",restore_best_weights=True)
+early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience=3, mode="max",restore_best_weights=True)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=100,callbacks=[early_stop_callback])
+    history=gan.fit(x_train, epochs=20)#,callbacks=[early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
 
 # print(history.history)
 
-model_name='latentdim10_CNN_40epochs_earlystop'
+model_name='NEW_3Gsteps_differentlearningrates'
 
 os.chdir('/home/florian/projet/generators')
-generator.save(model_name + '.h5')  # creates a HDF5 file 'my_model.h5'
-
+generator.save(model_name + '_G.h5')  # creates a HDF5 file 'my_model.h5'
+discriminator.save(model_name + '_D.h5')
 # save to csv: 
 hist_csv_file = model_name+'history.csv'
 with open(hist_csv_file, mode='w') as f:
