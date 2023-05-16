@@ -5,6 +5,7 @@ from keras.models import load_model
 import numpy as np
 import os
 import pandas as pd
+from keras import backend
 
 with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_2L = f['2L']
@@ -14,6 +15,10 @@ with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_4 = f['4']
     X_X = f['X']
     X_Y = f['Y']
+
+# implementation of wasserstein loss
+def wasserstein_loss(y_true, y_pred):
+	return backend.mean(y_true * y_pred)
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -94,7 +99,7 @@ class GAN(keras.Model):
         self.discriminator = discriminator
         self.generator = generator
         self.latent_dim = latent_dim
-        self.g_steps_per_d_step = 3
+        self.g_steps_per_d_step = 1
 
     def compile(self, d_optimizer, g_optimizer, loss_fn):
         super(GAN, self).compile()
@@ -150,33 +155,29 @@ class GAN(keras.Model):
 # Prepare the dataset. We use both the training & test MNIST digits.
 
 batch_size = 256
-x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**18)
+x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**12)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
-
-# all_digits = np.concatenate([x_train, x_test])
-
-# dataset = tf.data.Dataset.from_tensor_slices(all_digits)
-# dataset = dataset.shuffle(buffer_size=1024).batch(batch_size)
 
 gan = GAN(discriminator=discriminator, generator=generator, latent_dim=latent_dim)
 gan.compile(
-    d_optimizer=keras.optimizers.Adam(learning_rate=0.0005),
-    g_optimizer=keras.optimizers.Adam(learning_rate=0.0001),
+    d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
+    g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     # loss_fn=keras.losses.MAE
     loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
+    # loss_fn = wasserstein_loss
 )
 
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience=3, mode="max",restore_best_weights=True)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=20)#,callbacks=[early_stop_callback])
+    history=gan.fit(x_train, epochs=50)#,callbacks=[early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
 
 # print(history.history)
 
-model_name='NEW_3Gsteps_differentlearningrates'
+model_name=''
 
 os.chdir('/home/florian/projet/generators')
 generator.save(model_name + '_G.h5')  # creates a HDF5 file 'my_model.h5'
