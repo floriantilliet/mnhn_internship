@@ -58,38 +58,39 @@ discriminator = keras.Sequential(
         layers.Conv1D(32, kernel_size=(11)),
         layers.LeakyReLU(alpha=0.2),
         layers.GlobalMaxPooling1D(),
-        layers.Dense(1,activation="sigmoid"),
+        layers.Dense(1,activation="linear")#,
+        # layers.Lambda(lambda x: 2*x-1)
     ],
     name="discriminator",
 )
 
 latent_dim=10
 
-# generator= tf.keras.models.Sequential([
-#         keras.Input(shape=(latent_dim)),
-#         tf.keras.layers.Dense(10, activation='relu'),
-#         tf.keras.layers.Dense((40000), activation="relu"),
-#         tf.keras.layers.Reshape((10000,4)),
-#         tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
-#         ])
+generator= tf.keras.models.Sequential([
+        keras.Input(shape=(latent_dim)),
+        tf.keras.layers.Dense(10, activation='relu'),
+        tf.keras.layers.Dense((40000), activation="relu"),
+        tf.keras.layers.Reshape((10000,4)),
+        tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+        ])
 
-generator = tf.keras.models.Sequential([
-    keras.Input(shape=(latent_dim)),
-    tf.keras.layers.Dense(200*4, activation='relu'),
-    tf.keras.layers.Reshape((200,4)),
-    tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
-    tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.BatchNormalization(),
-    tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
-    tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
-    tf.keras.layers.MaxPooling1D(pool_size=(2)),
-    tf.keras.layers.BatchNormalization(),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense((40000), activation="relu"),
-    tf.keras.layers.Reshape((10000,4)),
-    tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
-    ])
+# generator = tf.keras.models.Sequential([
+#     keras.Input(shape=(latent_dim)),
+#     tf.keras.layers.Dense(200*4, activation='relu'),
+#     tf.keras.layers.Reshape((200,4)),
+#     tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
+#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
+#     tf.keras.layers.BatchNormalization(),
+#     tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
+#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
+#     tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
+#     tf.keras.layers.MaxPooling1D(pool_size=(2)),
+#     tf.keras.layers.BatchNormalization(),
+#     tf.keras.layers.Flatten(),
+#     tf.keras.layers.Dense((40000), activation="relu"),
+#     tf.keras.layers.Reshape((10000,4)),
+#     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+#     ])
 
 
 
@@ -99,7 +100,8 @@ class GAN(keras.Model):
         self.discriminator = discriminator
         self.generator = generator
         self.latent_dim = latent_dim
-        self.g_steps_per_d_step = 1
+        self.g_steps_per_d_step = 2
+        self.d_steps_per_g_step = 1
 
     def compile(self, d_optimizer, g_optimizer, loss_fn):
         super(GAN, self).compile()
@@ -108,30 +110,32 @@ class GAN(keras.Model):
         self.loss_fn = loss_fn
 
     def train_step(self, real_sequences):
-        # Sample random points in the latent space
-        batch_size = tf.shape(real_sequences)[0]
-        random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
+        
+        for i in range(self.g_steps_per_d_step):
+            # Sample random points in the latent space
+            batch_size = tf.shape(real_sequences)[0]
+            random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
 
-        # Decode them to fake sequences
-        generated_sequences = self.generator(random_latent_vectors)
+            # Decode them to fake sequences
+            generated_sequences = self.generator(random_latent_vectors)
 
-        # Combine them with real sequences
-        combined_sequences = tf.concat([generated_sequences, real_sequences], axis=0)
+            # Combine them with real sequences
+            combined_sequences = tf.concat([generated_sequences, real_sequences], axis=0)
 
-        # Assemble labels discriminating real from fake sequences
-        labels = tf.concat(
-            [tf.ones((batch_size, 1)), tf.zeros((batch_size, 1))], axis=0
-        )
-        # # Add random noise to the labels - important trick!
-        # labels += 0.05 * tf.random.uniform(tf.shape(labels))
+            # Assemble labels discriminating real from fake sequences
+            labels = tf.concat(
+                [tf.ones((batch_size, 1)), -1*tf.ones((batch_size, 1))], axis=0
+            )
+            # Add random noise to the labels - important trick!
+            labels += 0.1 * tf.random.uniform(tf.shape(labels))
 
-        # Train the discriminator
-        with tf.GradientTape() as tape:
-            predictions = self.discriminator(combined_sequences)
-            d_loss = self.loss_fn(labels, predictions)
-        grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
-        self.d_optimizer.apply_gradients(
-            zip(grads, self.discriminator.trainable_weights)
+            # Train the discriminator
+            with tf.GradientTape() as tape:
+                predictions = self.discriminator(combined_sequences)
+                d_loss = self.loss_fn(labels, predictions)
+            grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
+            self.d_optimizer.apply_gradients(
+                zip(grads, self.discriminator.trainable_weights)
         )
 
         for i in range(self.g_steps_per_d_step):
@@ -139,13 +143,13 @@ class GAN(keras.Model):
             random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
 
             # Assemble labels that say "all real sequences"
-            misleading_labels = tf.zeros((batch_size, 1))
+            misleading_labels = -1*tf.ones((batch_size, 1))
 
             # Train the generator (note that we should *not* update the weights
             # of the discriminator)!
             with tf.GradientTape() as tape:
                 predictions = self.discriminator(self.generator(random_latent_vectors))
-                g_loss = self.loss_fn(misleading_labels, predictions)
+                g_loss = (self.loss_fn(misleading_labels, predictions))
             grads = tape.gradient(g_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
@@ -155,29 +159,31 @@ class GAN(keras.Model):
 # Prepare the dataset. We use both the training & test MNIST digits.
 
 batch_size = 256
-x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**12)
+x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
 
 gan = GAN(discriminator=discriminator, generator=generator, latent_dim=latent_dim)
 gan.compile(
-    d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
-    g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
+    # d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
+    # g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
+    d_optimizer=keras.optimizers.RMSprop(lr=0.00003),
+    g_optimizer=keras.optimizers.RMSprop(lr=0.00003),
     # loss_fn=keras.losses.MAE
-    loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
-    # loss_fn = wasserstein_loss
+    # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
+    loss_fn = wasserstein_loss
 )
 
 early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience=3, mode="max",restore_best_weights=True)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=50)#,callbacks=[early_stop_callback])
+    history=gan.fit(x_train, epochs=5000)#,callbacks=[early_stop_callback])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
 
 # print(history.history)
 
-model_name=''
+model_name='smallergen_wgan_RMS_steps_linear'
 
 os.chdir('/home/florian/projet/generators')
 generator.save(model_name + '_G.h5')  # creates a HDF5 file 'my_model.h5'
