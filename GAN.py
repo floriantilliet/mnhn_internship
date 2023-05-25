@@ -17,9 +17,28 @@ with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_X = f['X']
     X_Y = f['Y']
 
+def sequence_entropy(seq):
+    return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
+
 # implementation of wasserstein loss
 def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
+
+def wasserstein_entropy_loss(y_true, y_pred, generated_sequences):
+    
+    mean_sequence = tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0]
+    entropies = tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])
+    mean_entropy = tf.math.reduce_sum((tf.math.reduce_sum(entropies,axis=0)/entropies.shape[0])/13863)
+    mean_sequence_entropy =(tf.math.reduce_sum(tf.math.reduce_sum(-mean_sequence*tf.math.log(mean_sequence+k.epsilon()), axis=1)/13863))
+    print(mean_sequence_entropy,mean_entropy)
+    return mean_entropy-mean_sequence_entropy
+        #+(1-backend.mean(y_true * y_pred)
+
+
+# def wasserstein_entropy_loss(y_true, y_pred, generated_sequences):
+#     return (tf.math.reduce_sum((tf.math.reduce_sum((tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])),axis=0)/(tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])).shape[0])/13863)
+#         -(tf.math.reduce_sum(tf.math.reduce_sum(-(tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0])*tf.math.log((tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0])+k.epsilon()), axis=1)/13863)))
+
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -120,9 +139,6 @@ generator = tf.keras.models.Sequential([
 #     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
 #     ])
 
-def sequence_entropy(seq):
-    return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
-
 class GAN(keras.Model):
     def __init__(self, discriminator, generator, latent_dim):
         super(GAN, self).__init__()
@@ -135,11 +151,12 @@ class GAN(keras.Model):
     # def call(self, inputs):
     #     return self.generator(inputs)
 
-    def compile(self, d_optimizer, g_optimizer, loss_fn):
+    def compile(self, d_optimizer, g_optimizer, d_loss_fn, g_loss_fn):
         super(GAN, self).compile(run_eagerly=True)
         self.d_optimizer = d_optimizer
         self.g_optimizer = g_optimizer
-        self.loss_fn = loss_fn
+        self.d_loss_fn = d_loss_fn
+        self.g_loss_fn = g_loss_fn
 
     def train_step(self, real_sequences):
         
@@ -159,7 +176,7 @@ class GAN(keras.Model):
 
             # Assemble labels discriminating real from fake sequences, noise added
             labels = tf.concat(
-                [-1*tf.ones((batch_size, 1))* tf.random.uniform((batch_size,1)), tf.ones((batch_size, 1))*tf.random.uniform((batch_size,1))], axis=0
+                [-1*tf.ones((batch_size, 1)), tf.ones((batch_size, 1))], axis=0
             )
 
             # # Add random noise to the labels - important trick!
@@ -168,7 +185,7 @@ class GAN(keras.Model):
             # Train the discriminator
             with tf.GradientTape() as tape:
                 predictions = self.discriminator(combined_sequences)
-                d_loss = 1-self.loss_fn(labels, predictions)
+                d_loss = 1-self.d_loss_fn(labels, predictions)
             grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
                 zip(grads, self.discriminator.trainable_weights)
@@ -181,31 +198,25 @@ class GAN(keras.Model):
             # Assemble labels that say "all real sequences"
             misleading_labels = tf.ones((batch_size, 1))
 
-            # misleading_labels += 0.1 * tf.random.uniform(tf.shape(misleading_labels))
-
             # Train the generator (note that we should *not* update the weights
             # of the discriminator)!
-            
-            
-
             with tf.GradientTape() as tape:
+            #     generated_sequences = self.generator(random_latent_vectors)
+            #     predictions = self.discriminator(generated_sequences)
+            #     mean_sequence = sum(generated_sequences.numpy())/len(generated_sequences.numpy())
+            #     entropies = [sequence_entropy(i) for i in generated_sequences.numpy()]    
+            #     g_loss = ((1-(self.g_loss_fn(misleading_labels, predictions)))
+            #             +(((sum(entropies)/len(entropies))/13863)
+            #             -(sequence_entropy(mean_sequence)/13863)))
+            # L.append([(sum(entropies)/len(entropies))/13863,(sequence_entropy(mean_sequence)/13863)])
                 generated_sequences = self.generator(random_latent_vectors)
                 predictions = self.discriminator(generated_sequences)
-                mean_sequence = sum(generated_sequences.numpy())/len(generated_sequences.numpy())
-                entropies = [sequence_entropy(i) for i in generated_sequences.numpy()]
-                print (((sum(entropies)/len(entropies))/13863),(sequence_entropy(mean_sequence)/13863))
-                
-                g_loss = ((1-(self.loss_fn(misleading_labels, predictions)))
-                        +((sum(entropies)/len(entropies))/13863)
-                        -(sequence_entropy(mean_sequence)/13863))
-            
+                g_loss=1-self.g_loss_fn(misleading_labels,predictions,generated_sequences)
             grads = tape.gradient(g_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
 
-# To limit the execution time, we only train on 100 batches. You can train on
-# the entire dataset. You will need about 20 epochs to get nice results.
-# Prepare the dataset. We use both the training & test MNIST digits.
+
 
 batch_size = 512
 x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
@@ -216,13 +227,14 @@ gan.compile(
     # d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     # g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     d_optimizer=keras.optimizers.RMSprop(lr=0.0003),
-    g_optimizer=keras.optimizers.RMSprop(lr=0.06),
+    g_optimizer=keras.optimizers.RMSprop(lr=0.03),
     # loss_fn=keras.losses.MAE
     # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
-    loss_fn = wasserstein_loss
+    d_loss_fn = wasserstein_loss,
+    g_loss_fn= wasserstein_entropy_loss
 )
 
-model_name='new_G_loss'
+model_name='no_wloss'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -232,13 +244,10 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=50)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=10)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
-
-# print(history.history)
-
 
 generator.save(model_name + '_G.h5')  # creates a HDF5 file 'my_model.h5'
 discriminator.save(model_name + '_D.h5')
