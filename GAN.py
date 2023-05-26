@@ -17,6 +17,11 @@ with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_X = f['X']
     X_Y = f['Y']
 
+D={}
+D['meanseq_entropy']=[]
+D['mean_entropy']=[]
+D['wasserstein']=[]
+
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
 
@@ -24,18 +29,22 @@ def sequence_entropy(seq):
 def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
 
-def wasserstein_loss(y_true, y_pred):
-	return tf.math.reduce_sum(y_true * y_pred)/((y_true * y_pred).shape[0])
+def wasserstein_gloss(y_true, y_pred):
+    seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
+    meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne
+    D['meanseq_entropy']+=[tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]]
+    D['mean_entropy']+=[tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)]
+    D['wasserstein']+=[14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))]
+    return (14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
 
-def wasserstein_entropy_loss(generated_sequences, y):
-    
-    mean_sequence = tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0]
-    entropies = tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])
-    mean_entropy = tf.math.reduce_sum((tf.math.reduce_sum(entropies,axis=0)/entropies.shape[0]))
-    mean_sequence_entropy =(tf.math.reduce_sum(tf.math.reduce_sum(-mean_sequence*tf.math.log(mean_sequence+k.epsilon()), axis=1)))
-    print(mean_sequence_entropy,mean_entropy)
-    return mean_entropy-mean_sequence_entropy
-        #+(1-backend.mean(y_true * y_pred)
+# def wasserstein_entropy_loss(y_true,y_pred):
+#     mean_sequence = tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]
+#     entropies = tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in y_true])
+#     mean_entropy = tf.math.reduce_sum((tf.math.reduce_sum(entropies,axis=0)/entropies.shape[0])/13863)
+#     mean_sequence_entropy =(tf.math.reduce_sum(tf.math.reduce_sum(-mean_sequence*tf.math.log(mean_sequence+k.epsilon()), axis=1))/13863)
+#     print(mean_sequence_entropy,mean_entropy)
+#     return mean_entropy-mean_sequence_entropy
+#         #+(1-backend.mean(y_true * y_pred)
 
 
 # def wasserstein_entropy_loss(y_true,y_pred):
@@ -131,7 +140,7 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.Dense((40000), activation="relu"),
     tf.keras.layers.Reshape((10000,4)),
     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2)),
-    layers.Lambda(lambda x: tf.keras.backend.argmax(x, axis=2))
+    # layers.Lambda(lambda x: tf.keras.backend.argmax(x, axis=2))
     ])
 
 # generator = tf.keras.models.Sequential([
@@ -195,7 +204,7 @@ class GAN(keras.Model):
             # Train the discriminator
             with tf.GradientTape() as tape:
                 predictions = self.discriminator(combined_sequences)
-                d_loss = 1-self.d_loss_fn(labels, predictions)
+                d_loss = (1-self.d_loss_fn(labels, predictions))*14000
             grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
                 zip(grads, self.discriminator.trainable_weights)
@@ -217,20 +226,19 @@ class GAN(keras.Model):
                 # mean_sequence = sum(generated_sequences.numpy())/len(generated_sequences.numpy())
                 # entropies = [sequence_entropy(i) for i in generated_sequences.numpy()]    
                 # g_loss = (1-(self.g_loss_fn(misleading_labels, predictions)))
-            #             +(((sum(entropies)/len(entropies))/13863)
-            #             -(sequence_entropy(mean_sequence)/13863)))
+                        # +(((sum(entropies)/len(entropies))/13863)
+                        # -(sequence_entropy(mean_sequence)/13863)))
             # L.append([(sum(entropies)/len(entropies))/13863,(sequence_entropy(mean_sequence)/13863)])
                 generated_sequences = self.generator(random_latent_vectors)
                 predictions = self.discriminator(generated_sequences)
-                blank=tf.zeros(generated_sequences.shape)
-                g_loss=1-self.g_loss_fn(generated_sequences,blank)
+                g_loss=self.g_loss_fn(predictions,generated_sequences)
             grads = tape.gradient(g_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
 
 
 
-batch_size = 32
+batch_size = 512
 x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
 
@@ -243,10 +251,10 @@ gan.compile(
     # loss_fn=keras.losses.MAE
     # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
     d_loss_fn = wasserstein_loss,
-    g_loss_fn= wasserstein_entropy_loss
+    g_loss_fn= wasserstein_gloss
 )
 
-model_name='no_wloss'
+model_name='new_try'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -256,10 +264,11 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=10)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=200)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
+    gen_losses = pd.DataFrame(D)
 
 generator.save(model_name + '_G.h5')  # creates a HDF5 file 'my_model.h5'
 discriminator.save(model_name + '_D.h5')
@@ -267,3 +276,7 @@ discriminator.save(model_name + '_D.h5')
 hist_csv_file = model_name+'history.csv'
 with open(hist_csv_file, mode='w') as f:
     hist_df.to_csv(f)
+
+gen_losses_csv_file = model_name+'gen_loss_history.csv'
+with open(gen_losses_csv_file, mode='w') as f:
+    gen_losses.to_csv(f)
