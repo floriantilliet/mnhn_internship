@@ -24,21 +24,28 @@ def sequence_entropy(seq):
 def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
 
-def wasserstein_entropy_loss(y_true, y_pred, generated_sequences):
+def wasserstein_loss(y_true, y_pred):
+	return tf.math.reduce_sum(y_true * y_pred)/((y_true * y_pred).shape[0])
+
+def wasserstein_entropy_loss(generated_sequences, y):
     
     mean_sequence = tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0]
     entropies = tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])
-    mean_entropy = tf.math.reduce_sum((tf.math.reduce_sum(entropies,axis=0)/entropies.shape[0])/13863)
-    mean_sequence_entropy =(tf.math.reduce_sum(tf.math.reduce_sum(-mean_sequence*tf.math.log(mean_sequence+k.epsilon()), axis=1)/13863))
+    mean_entropy = tf.math.reduce_sum((tf.math.reduce_sum(entropies,axis=0)/entropies.shape[0]))
+    mean_sequence_entropy =(tf.math.reduce_sum(tf.math.reduce_sum(-mean_sequence*tf.math.log(mean_sequence+k.epsilon()), axis=1)))
     print(mean_sequence_entropy,mean_entropy)
     return mean_entropy-mean_sequence_entropy
         #+(1-backend.mean(y_true * y_pred)
 
 
-# def wasserstein_entropy_loss(y_true, y_pred, generated_sequences):
-#     return (tf.math.reduce_sum((tf.math.reduce_sum((tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])),axis=0)/(tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in generated_sequences])).shape[0])/13863)
-#         -(tf.math.reduce_sum(tf.math.reduce_sum(-(tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0])*tf.math.log((tf.math.reduce_sum(generated_sequences,axis=0)/generated_sequences.shape[0])+k.epsilon()), axis=1)/13863)))
+# def wasserstein_entropy_loss(y_true,y_pred):
+#     return (tf.math.reduce_sum((tf.math.reduce_sum(tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in y_true]),axis=0)/tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in y_true]).shape[0])/13863)
+#             -tf.math.reduce_sum(tf.math.reduce_sum(-tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]*tf.math.log(tf.math.reduce_sum(y_true,axis=0)/y_true.shape[0]+k.epsilon()), axis=1)/13863))
 
+
+
+# def wasserstein_entropy_loss(y_true,y_pred):
+#     return tf.math.reduce_sum(tf.math.reduce_sum(y_pred-y_true,axis=1))
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -92,6 +99,8 @@ discriminator = keras.Sequential(
         layers.GlobalMaxPooling1D(),
         layers.Dense(1,activation="sigmoid"),
         layers.Lambda(lambda x: 2*x-1)
+
+
     ],
     name="discriminator",
 )
@@ -121,7 +130,8 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.Flatten(),
     tf.keras.layers.Dense((40000), activation="relu"),
     tf.keras.layers.Reshape((10000,4)),
-    tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
+    tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2)),
+    layers.Lambda(lambda x: tf.keras.backend.argmax(x, axis=2))
     ])
 
 # generator = tf.keras.models.Sequential([
@@ -197,28 +207,30 @@ class GAN(keras.Model):
 
             # Assemble labels that say "all real sequences"
             misleading_labels = tf.ones((batch_size, 1))
+            
 
             # Train the generator (note that we should *not* update the weights
             # of the discriminator)!
             with tf.GradientTape() as tape:
-            #     generated_sequences = self.generator(random_latent_vectors)
-            #     predictions = self.discriminator(generated_sequences)
-            #     mean_sequence = sum(generated_sequences.numpy())/len(generated_sequences.numpy())
-            #     entropies = [sequence_entropy(i) for i in generated_sequences.numpy()]    
-            #     g_loss = ((1-(self.g_loss_fn(misleading_labels, predictions)))
+                # generated_sequences = self.generator(random_latent_vectors)
+                # predictions = self.discriminator(generated_sequences)
+                # mean_sequence = sum(generated_sequences.numpy())/len(generated_sequences.numpy())
+                # entropies = [sequence_entropy(i) for i in generated_sequences.numpy()]    
+                # g_loss = (1-(self.g_loss_fn(misleading_labels, predictions)))
             #             +(((sum(entropies)/len(entropies))/13863)
             #             -(sequence_entropy(mean_sequence)/13863)))
             # L.append([(sum(entropies)/len(entropies))/13863,(sequence_entropy(mean_sequence)/13863)])
                 generated_sequences = self.generator(random_latent_vectors)
                 predictions = self.discriminator(generated_sequences)
-                g_loss=1-self.g_loss_fn(misleading_labels,predictions,generated_sequences)
+                blank=tf.zeros(generated_sequences.shape)
+                g_loss=1-self.g_loss_fn(generated_sequences,blank)
             grads = tape.gradient(g_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
 
 
 
-batch_size = 512
+batch_size = 32
 x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
 
