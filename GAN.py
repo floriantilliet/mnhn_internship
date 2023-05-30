@@ -32,10 +32,10 @@ def wasserstein_loss(y_true, y_pred):
 def wasserstein_gloss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne
-    D['meanseq_entropy']+=[tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]]
-    D['mean_entropy']+=[tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)]
+    D['meanseq_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
+    D['mean_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
     D['wasserstein']+=[14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))]
-    return (14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
+    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0).numpy())
 
 # def wasserstein_entropy_loss(y_true,y_pred):
 #     mean_sequence = tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]
@@ -254,7 +254,7 @@ gan.compile(
     g_loss_fn= wasserstein_gloss
 )
 
-model_name='new_try'
+model_name='new_try_separated'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -264,7 +264,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=200)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=1000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
