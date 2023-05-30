@@ -7,6 +7,7 @@ import os
 import pandas as pd
 from keras import backend
 import keras.backend as k
+import random as rd
 
 with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_2L = f['2L']
@@ -17,10 +18,14 @@ with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_X = f['X']
     X_Y = f['Y']
 
+pred_name='new_cut_2001_KC_G'
+predictor = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
+
 D={}
 D['meanseq_entropy']=[]
 D['mean_entropy']=[]
 D['wasserstein']=[]
+D['peak']=[]
 
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
@@ -29,32 +34,23 @@ def sequence_entropy(seq):
 def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
 
-def wasserstein_gloss(y_true, y_pred):
+requested_peak_height=0.8  
+requested_peak_loc=5000
+
+def wasserstein_entropy_peak_loss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
-    meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne
+    meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
+    predictions = predictor(y_pred[:,requested_peak_loc-1000:requested_peak_loc+1001])#prédictions signal ATACseq
+
+    D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['wasserstein']+=[14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))]
-    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0).numpy())
+    D['peak']+=[((requested_peak_height-tf.math.reduce_sum(predictions)/predictions.shape[0])*7000).numpy()]
 
-# def wasserstein_entropy_loss(y_true,y_pred):
-#     mean_sequence = tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]
-#     entropies = tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in y_true])
-#     mean_entropy = tf.math.reduce_sum((tf.math.reduce_sum(entropies,axis=0)/entropies.shape[0])/13863)
-#     mean_sequence_entropy =(tf.math.reduce_sum(tf.math.reduce_sum(-mean_sequence*tf.math.log(mean_sequence+k.epsilon()), axis=1))/13863)
-#     print(mean_sequence_entropy,mean_entropy)
-#     return mean_entropy-mean_sequence_entropy
-#         #+(1-backend.mean(y_true * y_pred)
-
-
-# def wasserstein_entropy_loss(y_true,y_pred):
-#     return (tf.math.reduce_sum((tf.math.reduce_sum(tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in y_true]),axis=0)/tf.convert_to_tensor([tf.math.reduce_sum(-i*tf.math.log(i+k.epsilon()), axis=1) for i in y_true]).shape[0])/13863)
-#             -tf.math.reduce_sum(tf.math.reduce_sum(-tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]*tf.math.log(tf.math.reduce_sum(y_true,axis=0)/y_true.shape[0]+k.epsilon()), axis=1)/13863))
-
-
-
-# def wasserstein_entropy_loss(y_true,y_pred):
-#     return tf.math.reduce_sum(tf.math.reduce_sum(y_pred-y_true,axis=1))
+    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
+            +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
+            -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0).numpy())
+            # +((requested_peak_height-tf.math.reduce_sum(predictions)/predictions.shape[0])*14000))
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -62,13 +58,8 @@ class SequenceFeeder(tf.keras.utils.Sequence):
         self.x = x_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
-
         self.max_data = max_data
-        # n_data = min(len(self.x)-self.WINDOW, max_data)
         self.all_indices = np.arange(len(x_set) - WINDOW + 1)
-        # self.indices = np.random.choice(self.indices, size=max_data, replace=False)
-        # self.indices=np.clip(self.indices,self.WINDOW//2,len(self.x)-self.WINDOW//2 -1)
-        # self.indices=np.unique(self.indices)
         self.on_epoch_end()
 
     def __len__(self):
@@ -82,7 +73,6 @@ class SequenceFeeder(tf.keras.utils.Sequence):
         
     def on_epoch_end(self):
         self.indices = np.random.choice(self.all_indices, size=self.max_data, replace=False)
-        # np.random.shuffle(self.indices)
 
 # discriminator = keras.Sequential(
 #     [
@@ -108,8 +98,6 @@ discriminator = keras.Sequential(
         layers.GlobalMaxPooling1D(),
         layers.Dense(1,activation="sigmoid"),
         layers.Lambda(lambda x: 2*x-1)
-
-
     ],
     name="discriminator",
 )
@@ -139,8 +127,7 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.Flatten(),
     tf.keras.layers.Dense((40000), activation="relu"),
     tf.keras.layers.Reshape((10000,4)),
-    tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2)),
-    # layers.Lambda(lambda x: tf.keras.backend.argmax(x, axis=2))
+    tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
     ])
 
 # generator = tf.keras.models.Sequential([
@@ -217,18 +204,9 @@ class GAN(keras.Model):
             # Assemble labels that say "all real sequences"
             misleading_labels = tf.ones((batch_size, 1))
             
-
             # Train the generator (note that we should *not* update the weights
             # of the discriminator)!
             with tf.GradientTape() as tape:
-                # generated_sequences = self.generator(random_latent_vectors)
-                # predictions = self.discriminator(generated_sequences)
-                # mean_sequence = sum(generated_sequences.numpy())/len(generated_sequences.numpy())
-                # entropies = [sequence_entropy(i) for i in generated_sequences.numpy()]    
-                # g_loss = (1-(self.g_loss_fn(misleading_labels, predictions)))
-                        # +(((sum(entropies)/len(entropies))/13863)
-                        # -(sequence_entropy(mean_sequence)/13863)))
-            # L.append([(sum(entropies)/len(entropies))/13863,(sequence_entropy(mean_sequence)/13863)])
                 generated_sequences = self.generator(random_latent_vectors)
                 predictions = self.discriminator(generated_sequences)
                 g_loss=self.g_loss_fn(predictions,generated_sequences)
@@ -251,10 +229,10 @@ gan.compile(
     # loss_fn=keras.losses.MAE
     # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
     d_loss_fn = wasserstein_loss,
-    g_loss_fn= wasserstein_gloss
+    g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='new_try_separated'
+model_name='GAN_nopeak'
 
 os.chdir('/home/florian/projet/generators/')
 
