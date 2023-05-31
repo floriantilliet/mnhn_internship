@@ -19,15 +19,16 @@ with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_Y = f['Y']
 
 pred_name='new_cut_2001_KC_G'
-predictor = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
+predictorKC = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
+pred_name='new_cut_2001_T1'
+predictorT1 = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
 
 D={}
 D['meanseq_entropy']=[]
 D['mean_entropy']=[]
 D['wasserstein']=[]
-D['peak']=[]
-D['left_floor']=[]
-D['right_floor']=[]
+D['peakKC']=[]
+D['peakT1']=[]
 
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
@@ -38,29 +39,30 @@ def wasserstein_loss(y_true, y_pred):
 
 requested_floor_height=0.01
 requested_peak_height=0.8  
-requested_peak_loc=5000
+KC_peak_loc=3000
+T1_peak_loc=7000
 
 def wasserstein_entropy_peak_loss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
-    predictions_peak = predictor(y_pred[:,requested_peak_loc-1000:requested_peak_loc+1001])#prédictions signal ATACseq
-    left_peak_mitigation= predictor(y_pred[:,requested_peak_loc-150-1000:requested_peak_loc-150+1001])
-    right_peak_mitigation= predictor(y_pred[:,requested_peak_loc+150-1000:requested_peak_loc+150+1001])
+    predictions_peakKC = predictorKC(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])#prédictions signal ATACseq
+    predictions_peakT1 = predictorT1(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])
 
     D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['peak']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak)/predictions_peak.shape[0])*7000).numpy()]
-    D['left_floor']+=[tf.math.abs((requested_floor_height-tf.math.reduce_sum(left_peak_mitigation)/left_peak_mitigation.shape[0])*7000).numpy()]
-    D['right_floor']+=[tf.math.abs((requested_floor_height-tf.math.reduce_sum(right_peak_mitigation)/right_peak_mitigation.shape[0])*7000).numpy()]
-    
+    D['peakKC']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
+                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
+    D['peakKC']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
+                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000).numpy()]
+
     return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
             +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
             -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
-            +(requested_peak_height-tf.math.reduce_sum(predictions_peak)/predictions_peak.shape[0])*7000
-            +tf.math.abs(requested_floor_height-tf.math.reduce_sum(right_peak_mitigation)/right_peak_mitigation.shape[0])*7000
-            +tf.math.abs(requested_floor_height-tf.math.reduce_sum(left_peak_mitigation)/left_peak_mitigation.shape[0])*7000)
-
+            +(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
+                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000)
+                   +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
+                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -252,7 +254,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=2000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=200)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
