@@ -34,8 +34,8 @@ def wasserstein_gloss(y_true, y_pred):
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['wasserstein']+=[14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))]
-    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0).numpy())
+    D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
+    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0))
 
 # def wasserstein_entropy_loss(y_true,y_pred):
 #     mean_sequence = tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]

@@ -26,6 +26,8 @@ D['meanseq_entropy']=[]
 D['mean_entropy']=[]
 D['wasserstein']=[]
 D['peak']=[]
+D['left_floor']=[]
+D['right_floor']=[]
 
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
@@ -34,23 +36,31 @@ def sequence_entropy(seq):
 def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
 
+requested_floor_height=0.2
 requested_peak_height=0.8  
 requested_peak_loc=5000
 
 def wasserstein_entropy_peak_loss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
-    predictions = predictor(y_pred[:,requested_peak_loc-1000:requested_peak_loc+1001])#prédictions signal ATACseq
+    predictions_peak = predictor(y_pred[:,requested_peak_loc-1000:requested_peak_loc+1001])#prédictions signal ATACseq
+    left_peak_mitigation= predictor(y_pred[:,requested_peak_loc-2151:requested_peak_loc-150])
+    right_peak_mitigation= predictor(y_pred[:,requested_peak_loc+150:requested_peak_loc+2151])
 
     D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['peak']+=[((requested_peak_height-tf.math.reduce_sum(predictions)/predictions.shape[0])*7000).numpy()]
-
+    D['peak']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak)/predictions_peak.shape[0])*7000).numpy()]
+    D['left_floor']+=[((requested_floor_height-tf.math.reduce_sum(left_peak_mitigation)/left_peak_mitigation.shape[0])*7000).numpy()]
+    D['right_floor']+=[((requested_floor_height-tf.math.reduce_sum(right_peak_mitigation)/right_peak_mitigation.shape[0])*7000).numpy()]
+    
     return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
             +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
-            -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0).numpy())
-            # +((requested_peak_height-tf.math.reduce_sum(predictions)/predictions.shape[0])*14000))
+            -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
+            +(requested_peak_height-tf.math.reduce_sum(predictions_peak)/predictions_peak.shape[0])*7000
+            +(requested_floor_height-tf.math.reduce_sum(right_peak_mitigation)/right_peak_mitigation.shape[0])*7000
+            +(requested_floor_height-tf.math.reduce_sum(left_peak_mitigation)/left_peak_mitigation.shape[0])*7000)
+
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -232,7 +242,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_nopeak'
+model_name='GAN_mitigated_halfpeak'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -242,7 +252,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=1000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=4000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
