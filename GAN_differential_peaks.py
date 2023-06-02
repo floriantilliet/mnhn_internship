@@ -51,18 +51,19 @@ def wasserstein_entropy_peak_loss(y_true, y_pred):
     D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['peakKC']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
-            +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
-    D['peakT1']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
-            +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000).numpy()]
+    D['peakKC']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])*7000).numpy()]
+            # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
+    D['peakT1']+=[((tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
+    # D['peakT1']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
+    #         +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000).numpy()]
 
     return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
         +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
         -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
-        +(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
-        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000)
         +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
         +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
+        # +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
+        # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -244,7 +245,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_differential_peaks'
+model_name='GAN_KConly'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -254,7 +255,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=10000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=2000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
