@@ -52,17 +52,17 @@ def wasserstein_entropy_peak_loss(y_true, y_pred):
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
     D['peakKC']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
-                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
+            +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
     D['peakT1']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
-                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000).numpy()]
+            +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000).numpy()]
 
     return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
-            +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
-            -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
-            +(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
-                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000)
-                   +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
-                   +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
+        +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
+        -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
+        +(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000)
+        +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
