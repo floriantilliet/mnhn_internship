@@ -40,7 +40,7 @@ def wasserstein_loss(y_true, y_pred):
 requested_floor_height=0.01
 requested_peak_height=0.8  
 KC_peak_loc=3000
-T1_peak_loc=7000
+T1_peak_loc=3000
 
 def wasserstein_entropy_peak_loss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
@@ -255,7 +255,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=2000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=10000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
