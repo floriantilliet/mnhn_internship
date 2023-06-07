@@ -27,8 +27,10 @@ D={}
 D['meanseq_entropy']=[]
 D['mean_entropy']=[]
 D['wasserstein']=[]
-D['peakKC']=[]
-D['peakT1']=[]
+D['peak1KC']=[]
+D['peak1T1']=[]
+D['peak2KC']=[]
+D['peak2T1']=[]
 
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
@@ -40,30 +42,35 @@ def wasserstein_loss(y_true, y_pred):
 requested_floor_height=0.01
 requested_peak_height=0.8  
 KC_peak_loc=3000
-T1_peak_loc=3000
+T1_peak_loc=7000
 
 def wasserstein_entropy_peak_loss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
-    predictions_peakKC = predictorKC(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])#prédictions signal ATACseq
-    predictions_peakT1 = predictorT1(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])
+
+    predictions_peak1KC = predictorKC(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])#prédictions signal ATACseq
+    predictions_peak1T1 = predictorT1(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])
+
+    predictions_peak2KC = predictorKC(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])#prédictions signal ATACseq
+    predictions_peak2T1 = predictorT1(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])
 
     D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['peakKC']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])*7000).numpy()]
-            # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
-    D['peakT1']+=[((tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000).numpy()]
-    # D['peakT1']+=[(((requested_peak_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0])
-    #         +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0]))*7000).numpy()]
+    D['peak1KC']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
+    D['peak1T1']+=[((tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0]))*7000).numpy()]
+
+    D['peak2KC']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
+    D['peak2T1']+=[((tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0]))*7000).numpy()]
 
     return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
         +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
         -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
-        +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
-        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
-        # +(((requested_peak_height-tf.math.reduce_sum(predictions_peakKC)/predictions_peakKC.shape[0])
-        # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peakT1)/predictions_peakT1.shape[0]))*7000))
+        +(((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0]))*7000)
+        +(((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0]))*7000))
+
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -245,7 +252,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_KConly'
+model_name='GAN_differential_peaks'
 
 os.chdir('/home/florian/projet/generators/')
 
