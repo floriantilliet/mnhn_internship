@@ -156,8 +156,13 @@ X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 
 fichiers = os.listdir('/home/florian/projet/cell_types')
 
-fichiers = ['scATACseq_KC_G.dedup.no_blacklist.RPGCnormalized.bw.npz',
-            'scATACseq_T1.dedup.no_blacklist.RPGCnormalized.bw.npz']
+fichiers = ['scATACseq_T2.dedup.no_blacklist.RPGCnormalized.bw.npz',
+            'scATACseq_T2a.dedup.no_blacklist.RPGCnormalized.bw.npz',
+            'scATACseq_T3.dedup.no_blacklist.RPGCnormalized.bw.npz',
+            'scATACseq_T4.dedup.no_blacklist.RPGCnormalized.bw.npz',
+            'scATACseq_T5.dedup.no_blacklist.RPGCnormalized.bw.npz',
+            'scATACseq_Perineurialglia.dedup.no_blacklist.RPGCnormalized.bw.npz',
+            'scATACseq_Subperineurialglia.dedup.no_blacklist.RPGCnormalized.bw.npz']
 
 for file in fichiers:
 
@@ -296,3 +301,5 @@ for file in fichiers:
 
     os.chdir('/home/florian/projet/models')
     np.savez_compressed('preds_'+model_name,**preds)
+
+    del model2
