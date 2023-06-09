@@ -6,9 +6,34 @@ import pandas as pd
 
 #general functions
 def get_max(array,n):
-    return ((-array).argsort()[:n])
+    """
+    returns the indexes of the n greatest values of an array
+
+    Parameters
+    ----------
+    array: np.ndarray of any shape,
+
+    Returns
+    -------
+    idx:depends on the shape of the array and n
+        int or list of indexes of the greatest values of an array
+    """
+    idx=(-array).argsort()[:n]
+    return (idx)
 
 def get_min(array,n):
+    """
+    returns the indexes of the n smallest values of an array
+
+    Parameters
+    ----------
+    array: np.ndarray of any shape,
+
+    Returns
+    -------
+    idx:depends on the shape of the array and n
+        int or list of indexes of the smallest values of an array
+    """
     return (array.argsort()[:n])
 
 def sliding_window_view(x, window_shape, axis = None, *,
@@ -291,6 +316,28 @@ def kmer_counts(one_hots, k, order='ACGT', includeN=True, as_pandas=True):
         return all_counts
 
 def mutation(window_start,chr, vals, size=2001):
+    """
+    performs random substitutions on the desired indexes of a one hot encoded DNA sequence
+
+    Parameters
+    ----------
+    chr: np.ndarray, shape=(n,4),
+        2D-array, a one hot encoded DNA sequence
+    
+    window_start: int,
+        start of the window where the substitutions are aimed
+
+    vals: list of int or int,
+        indexes of the bases to be mutated
+
+    size: int,
+        size of the window where the mutations are aimed
+
+    Returns
+    -------
+    mut: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded mutated sequence
+    """
     mut=np.copy(chr)
     for i in vals:
         if 0 < i <= size:
@@ -304,6 +351,28 @@ def mutation(window_start,chr, vals, size=2001):
     return mut
 
 def aimed_mutation(window_start,chr, vals,size=2001):
+    """
+    performs precise substitutions on the desired indexes of a one hot encoded DNA sequence
+
+    Parameters
+    ----------
+    chr: np.ndarray, shape=(n,4),
+        2D-array, a one hot encoded DNA sequence
+    
+    window_start: int,
+        start of the window where the substitutions are aimed
+
+    vals: list of int or int,
+        indexes of the target substitutions
+
+    size: int,
+        size of the window where the mutations are aimed
+
+    Returns
+    -------
+    mut: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded mutated sequence
+    """
     mut=np.copy(chr)
     for i in vals:
         if 0 < i <= size:
@@ -318,15 +387,76 @@ def aimed_mutation(window_start,chr, vals,size=2001):
 
 #Sequence prediction related functions 
 def fast_pred(input,model):
-    return model(tf.expand_dims(tf.cast(input,tf.float32),0))
+    """
+    takes an input window of a one hot encoded DNA sequence, an ATAC-seq prediction model, and returns the model's
+    prediction on the input sequence
+
+    Parameters
+    ----------
+    input: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded DNA sequence
+    
+    model: an ATAC-seq prediction model 
+        (be aware of its required input window)
+
+    Returns
+    -------
+    pred: float
+        the predicted value of the ATAC-seq signal at the middle of the window 
+    """
+    pred=model(tf.expand_dims(tf.cast(input,tf.float32),0))
+    return pred
 
 def fast_pred_seq(input,window_start,model,size=2001):
+    """
+    takes an input one hot encoded DNA sequence and a corresponding window, an ATAC-seq prediction model, 
+    and returns the model's prediction on the input sequence
+
+    Parameters
+    ----------
+    input: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded DNA sequence
+    
+    model: an ATAC-seq prediction model 
+        (be aware of its required input window)
+    
+    window_start: int,
+        start of the window where the signal is to be predicted
+
+    size: int,
+        size of the window where the signal is to be predicted
+
+    Returns
+    -------
+    pred: list of float
+        the predicted values of the ATAC-seq signal across the window
+    """
     X=[]
     for i in range(window_start,window_start+size):
         X.append(np.array(fast_pred(input[i-(size//2):i+(size//2)+1],model))[0])
     return(X)
 
 def fast_pred_whole_seq(input,model,size=2001):
+    """
+    takes an input one hot encoded DNA sequence, an ATAC-seq prediction model, 
+    and returns the model's prediction on entirety of the input sequence
+
+    Parameters
+    ----------
+    input: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded DNA sequence
+    
+    model: an ATAC-seq prediction model 
+        (be aware of its required input window)
+
+    size: int,
+        needed size of the windows for the model to make it's predictions
+
+    Returns
+    -------
+    pred: list of floats
+        the predicted values of the ATAC-seq signal across the whole sequence
+    """
     X=[]
     length=len(np.array(input[0]))
     for i in range(size//2,length-(size//2),10):
@@ -335,6 +465,24 @@ def fast_pred_whole_seq(input,model,size=2001):
 
 #Saliency maps related functions
 def compute_saliency_map(input_seq, model):
+    """
+    takes an input one hot encoded DNA sequence, an ATAC-seq prediction model, 
+    and returns the saliency map (where the values of each base of a position are summed) 
+    corresponding to the model's prediction on the input sequence
+
+    Parameters
+    ----------
+    input: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded DNA sequence
+    
+    model: an ATAC-seq prediction model 
+        (be aware of its required input window of len n)
+
+    Returns
+    -------
+    saliency_map: np.ndarray, shape(n,)
+        the saliency values of each position across the window
+    """
     input_seq=tf.cast(input_seq,tf.float32)
     with tf.GradientTape() as tape:
         tape.watch(input_seq)
@@ -347,6 +495,23 @@ def compute_saliency_map(input_seq, model):
     return saliency_map
 
 def compute_saliency_channels(input_seq, model):
+    """
+    takes an input one hot encoded DNA sequence, an ATAC-seq prediction model, 
+    and returns the saliency map corresponding to the model's prediction on the input sequence
+
+    Parameters
+    ----------
+    input: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded DNA sequence
+    
+    model: an ATAC-seq prediction model 
+        (be aware of its required input window of len n)
+
+    Returns
+    -------
+    saliency_map: np.ndarray, shape(n,4,)
+        the saliency values of possible base across the window
+    """
     input_seq=tf.cast(input_seq,tf.float32)
     with tf.GradientTape() as tape:
         tape.watch(input_seq)
@@ -358,6 +523,29 @@ def compute_saliency_channels(input_seq, model):
     return saliency_map
 
 def window_map(input,window_start,model,size=2001):
+    """
+    takes an input one hot encoded DNA sequence, an ATAC-seq prediction model, 
+    and returns the saliency map corresponding to the model's prediction on the input sequence
+
+    Parameters
+    ----------
+    input: np.ndarray, shape=(n,4),
+        2D-array, one hot encoded DNA sequence
+    
+    model: an ATAC-seq prediction model 
+        (be aware of its required input window of len n)
+    
+    window_start: int,
+        start of the window where the signal is to be predicted
+
+    size: int,
+        size of the window where the signal is to be predicted 
+
+    Returns
+    -------
+    Y: np.ndarray, shape(n,4,size,)
+        the saliency maps of the different predictions across sliding windows
+    """
     model=model
     Y=np.zeros(size*2)
     for i in range (-(size//2),size//2):
