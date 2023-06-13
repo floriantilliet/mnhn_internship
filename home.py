@@ -332,7 +332,6 @@ plt.figure(figsize=(15,10))
 
 plt.subplot(6,2,1)
 plt.plot(fast_mod1_KC_G[::10],label='KC_G',alpha=0.5)
-plt.plot(pred100[start1:stop1:10],label='base_sequence')
 plt.legend()
 plt.ylim(0,1)
 
