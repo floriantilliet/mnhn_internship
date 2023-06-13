@@ -283,7 +283,7 @@ plt.text(0,1,"mean score on 3R sequences (unknown set): " + str(round(mean_score
 plt.text(0,0,"mean score on random sequences: " + str(round(mean_scoreRD,4)))
 plt.axis("off")
 plt.show()
-plt.savefig("mnhn_internship/im1.png")
+plt.savefig("im1.png")
 plt.close()
 
 seq_generated = modelgen.predict(tf.random.normal((1, 10)))
@@ -386,5 +386,5 @@ plt.plot(fast_mod1_Subperineurialglia[::10],label='Subperineurialglia',alpha=0.5
 plt.legend()
 plt.ylim(0,1)
 plt.show()
-plt.savefig("mnhn_internship/im0.png")
+plt.savefig("im0.png")
 plt.close()
