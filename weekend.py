@@ -156,7 +156,7 @@ X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 
 fichiers = os.listdir('/home/florian/projet/cell_types')
 
-fichiers = ['scATACseq_Subperineurialglia.dedup.no_blacklist.RPGCnormalized.bw.npz']
+fichiers = ['scATACseq_all_butKC.npz']
 
 for file in fichiers:
 
@@ -182,7 +182,7 @@ for file in fichiers:
 
 
     #create scATAC values for each chr
-    cut=50
+    cut=100
     Y_2L=np.load('/home/florian/projet/cell_types/'+file)['2L'][0]
     Y_2L[Y_2L >= cut] = cut
     Y_2L=Y_2L/cut
@@ -208,8 +208,8 @@ for file in fichiers:
     Y_X=Y_X/cut
 
     Y_Y=np.load('/home/florian/projet/cell_types/'+file)['Y'][0]
-    Y_Y[Y_Y >= 15] = 15
-    Y_Y=Y_Y/15
+    Y_Y[Y_Y >= 10] = 10
+    Y_Y=Y_Y/10
 
     #generates homebrew weighted values
     x=np.concatenate((X_2L,X_4,X_3R))
@@ -220,7 +220,7 @@ for file in fichiers:
     gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
     gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**15)
 
-    model_name='new_cut_2001_{}'.format(file[10:-41])
+    model_name='new_cut_2001_{}'.format('all_butKC')
 
     dir='/home/florian/projet/models/' + model_name + '/'
 
