@@ -139,11 +139,13 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.Dropout(0.2),
     tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.Dropout(0.2),
     tf.keras.layers.Flatten(),
     tf.keras.layers.Dense((40000), activation="relu"),
     tf.keras.layers.Reshape((10000,4)),
@@ -252,7 +254,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_differential_peaks'
+model_name='GAN_differential_peaks2'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -262,7 +264,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=20000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=2000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
