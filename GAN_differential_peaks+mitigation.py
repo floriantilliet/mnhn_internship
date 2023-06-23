@@ -18,64 +18,9 @@ with np.load('/home/florian/projet/r6.16/seq.npz') as f:
     X_X = f['X']
     X_Y = f['Y']
 
-pred_name='new_cut_2001_KC_G'
-predictorKC = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
-pred_name='new_cut_2001_T1'
-predictorT1 = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
-
-D={}
-D['meanseq_entropy']=[]
-D['mean_entropy']=[]
-D['wasserstein']=[]
-D['peak1KC']=[]
-D['peak1T1']=[]
-D['peak2KC']=[]
-D['peak2T1']=[]
-
-def sequence_entropy(seq):
-    return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
-
 # implementation of wasserstein loss
 def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
-
-requested_floor_height=0.01
-requested_peak_height=0.8  
-KC_peak_loc=3000
-T1_peak_loc=7000
-
-def wasserstein_entropy_peak_loss(y_true, y_pred):
-    seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
-    meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
-
-    predictions_peak1KC = predictorKC(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])#prédictions signal ATACseq
-    predictions_peak1T1 = predictorT1(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])
-
-    predictions_peak2KC = predictorKC(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])#prédictions signal ATACseq
-    predictions_peak2T1 = predictorT1(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])
-
-    D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
-    D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
-    D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    
-    D['peak1KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
-    # D['peak1T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000).numpy()]
-    D['peak1T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
-
-    D['peak2KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
-    # D['peak2T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000).numpy()]
-    D['peak2T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
-
-    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
-        +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
-        -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
-        +(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
-        # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
-        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000
-        +(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
-        # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
-        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000)
-
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
@@ -99,19 +44,6 @@ class SequenceFeeder(tf.keras.utils.Sequence):
     def on_epoch_end(self):
         self.indices = np.random.choice(self.all_indices, size=self.max_data, replace=False)
 
-# discriminator = keras.Sequential(
-#     [
-#         layers.Conv1D(64, kernel_size=(5), input_shape=(10000,4)),
-#         layers.LeakyReLU(alpha=0.2),
-#         layers.Conv1D(32, kernel_size=(11)),
-#         layers.LeakyReLU(alpha=0.2),
-#         layers.GlobalMaxPooling1D(),
-#         layers.Dense(1,activation="sigmoid"),
-#         layers.Lambda(lambda x: 2*x-1)
-#     ],
-#     name="discriminator",
-# )
-
 discriminator = keras.Sequential(
     [
         layers.Conv1D(64, kernel_size=(5), input_shape=(10000,4)),
@@ -128,14 +60,6 @@ discriminator = keras.Sequential(
 )
 
 latent_dim=10
-
-# generator= tf.keras.models.Sequential([
-#         keras.Input(shape=(latent_dim)),
-#         tf.keras.layers.Dense(10, activation='relu'),
-#         tf.keras.layers.Dense((40000), activation="relu"),
-#         tf.keras.layers.Reshape((10000,4)),
-#         tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
-#         ])
 
 generator = tf.keras.models.Sequential([
     keras.Input(shape=(latent_dim)),
@@ -156,21 +80,6 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.Reshape((10000,4)),
     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
     ])
-
-# generator = tf.keras.models.Sequential([
-#     keras.Input(shape=(8000)),
-#     # tf.keras.layers.Dense(200*4, activation='relu'),
-#     tf.keras.layers.Reshape((2000,4)),
-#     tf.keras.layers.Conv1DTranspose(filters=64, kernel_size=(300), padding='valid', activation='relu'),
-#     tf.keras.layers.BatchNormalization(),
-#     tf.keras.layers.Conv1DTranspose(filters=32, kernel_size=(112), padding='valid', activation='relu'),
-#     tf.keras.layers.BatchNormalization(),
-#     tf.keras.layers.Conv1DTranspose(filters=16, kernel_size=(91), padding='valid', activation='relu'),
-#     tf.keras.layers.BatchNormalization(),
-#     tf.keras.layers.Flatten(),
-#     tf.keras.layers.Reshape((10000,4)),
-#     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
-#     ])
 
 class GAN(keras.Model):
     def __init__(self, discriminator, generator, latent_dim):
@@ -241,6 +150,75 @@ class GAN(keras.Model):
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
 
+#peak mitigation
+
+pred_name='new_cut_2001_KC_G'
+predictorKC = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
+pred_name='new_cut_2001_T1'
+predictorT1 = load_model('/home/florian/projet/models/'+ pred_name +'/'+ pred_name+ '.h5', compile=False)
+
+D={}
+D['meanseq_entropy']=[]
+D['mean_entropy']=[]
+D['wasserstein']=[]
+D['peak1KC']=[]
+D['peak1T1']=[]
+D['left_mitigation_peak1KC']=[]
+D['right_mitigation_peak1KC']=[]
+D['peak2KC']=[]
+D['peak2T1']=[]
+D['left_mitigation_peak2T1']=[]
+D['right_mitigation_peak2T1']=[]
+
+def sequence_entropy(seq):
+    return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
+
+requested_floor_height=0.01
+requested_peak_height=0.8  
+KC_peak_loc=3000
+T1_peak_loc=7000
+
+def wasserstein_entropy_peak_loss_mitigated(y_true, y_pred):
+    seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
+    meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
+
+    predictions_peak1KC = predictorKC(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])#prédictions signal ATACseq
+    left_mitigation1KC= predictorKC(y_pred[:,KC_peak_loc-150-1000:KC_peak_loc-150+1001])
+    right_mitigation1KC= predictorKC(y_pred[:,KC_peak_loc+150-1000:KC_peak_loc+150+1001])
+    predictions_peak1T1 = predictorT1(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])
+
+    predictions_peak2KC = predictorKC(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])#prédictions signal ATACseq
+    left_mitigation2T1= predictorT1(y_pred[:,T1_peak_loc-150-1000:T1_peak_loc-150+1001])
+    right_mitigation2T1= predictorT1(y_pred[:,T1_peak_loc+150-1000:T1_peak_loc+150+1001])
+    predictions_peak2T1 = predictorT1(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])
+
+    D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000).numpy()]
+    D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
+    D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
+    
+    D['peak1KC']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
+    D['peak1T1']+=[((tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0]))*7000).numpy()]
+    D['left_mitigation_peak1KC']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(left_mitigation1KC)/left_mitigation1KC.shape[0])*7000).numpy()]
+    D['right_mitigation_peak1KC']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(right_mitigation1KC)/right_mitigation1KC.shape[0])*7000).numpy()]
+    
+    D['peak2KC']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
+    D['peak2T1']+=[((tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0]))*7000).numpy()]
+    D['left_mitigation_peak2T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(left_mitigation2T1)/left_mitigation2T1.shape[0])*7000).numpy()]
+    D['right_mitigation_peak2T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(right_mitigation2T1)/right_mitigation2T1.shape[0])*7000).numpy()]
+
+    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
+        +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
+        -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
+
+        +(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(left_mitigation1KC)/left_mitigation1KC.shape[0])*7000
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(right_mitigation1KC)/right_mitigation1KC.shape[0])*7000
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000
+
+        +(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(left_mitigation2T1)/left_mitigation2T1.shape[0])*7000
+        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(right_mitigation2T1)/right_mitigation2T1.shape[0])*7000)
 
 
 batch_size = 512
@@ -256,10 +234,10 @@ gan.compile(
     # loss_fn=keras.losses.MAE
     # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
     d_loss_fn = wasserstein_loss,
-    g_loss_fn= wasserstein_entropy_peak_loss
+    g_loss_fn= wasserstein_entropy_peak_loss_mitigated
 )
 
-model_name='GAN_differential_peaks_test'
+model_name='GAN_differential_peaks_mitigated'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -269,7 +247,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=10000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=20000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 

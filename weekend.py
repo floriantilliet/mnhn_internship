@@ -156,7 +156,8 @@ X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 
 fichiers = os.listdir('/home/florian/projet/cell_types')
 
-fichiers = ['scATACseq_all_butKC.npz']
+fichiers = ['scATACseq_allT.npz',
+            'scATACseq_allGlia.npz']
 
 for file in fichiers:
 
@@ -220,7 +221,7 @@ for file in fichiers:
     gen = MyHbWeightedSequence(x, y, batch_size, max_data=2**20)
     gen_valid = MyValidSequence(x_valid, y_valid, batch_size, max_data=2**15)
 
-    model_name='new_cut_2001_{}'.format('all_butKC')
+    model_name='new_cut_2001_{}'.format(file[10:-4])
 
     dir='/home/florian/projet/models/' + model_name + '/'
 

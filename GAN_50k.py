@@ -27,10 +27,10 @@ D={}
 D['meanseq_entropy']=[]
 D['mean_entropy']=[]
 D['wasserstein']=[]
-D['peak1KC']=[]
-D['peak1T1']=[]
-D['peak2KC']=[]
-D['peak2T1']=[]
+# D['peak1KC']=[]
+# D['peak1T1']=[]
+# D['peak2KC']=[]
+# D['peak2T1']=[]
 
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
@@ -58,28 +58,28 @@ def wasserstein_entropy_peak_loss(y_true, y_pred):
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
     
-    D['peak1KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
-    # D['peak1T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000).numpy()]
-    D['peak1T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
+    # D['peak1KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
+    # # D['peak1T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000).numpy()]
+    # D['peak1T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
 
-    D['peak2KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
-    # D['peak2T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000).numpy()]
-    D['peak2T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
+    # D['peak2KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
+    # # D['peak2T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000).numpy()]
+    # D['peak2T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
 
     return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
         +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
-        -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)
-        +(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
-        # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
-        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000
-        +(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
-        # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
-        +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000)
+        -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0))
+        # +(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
+        # # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
+        # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000
+        # +(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
+        # # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
+        # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000)
 
 
 class SequenceFeeder(tf.keras.utils.Sequence):
 
-    def __init__(self, x_set, batch_size, max_data=2**20, WINDOW=10000):
+    def __init__(self, x_set, batch_size, max_data=2**20, WINDOW=50000):
         self.x = x_set
         self.batch_size = batch_size
         self.WINDOW = WINDOW
@@ -114,7 +114,7 @@ class SequenceFeeder(tf.keras.utils.Sequence):
 
 discriminator = keras.Sequential(
     [
-        layers.Conv1D(64, kernel_size=(5), input_shape=(10000,4)),
+        layers.Conv1D(64, kernel_size=(5), input_shape=(50000,4)),
         layers.LeakyReLU(alpha=0.2),
         layers.Conv1D(32, kernel_size=(9)),
         layers.LeakyReLU(alpha=0.2),
@@ -152,8 +152,8 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Dropout(0.2),
     tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense((40000), activation="relu"),
-    tf.keras.layers.Reshape((10000,4)),
+    tf.keras.layers.Dense((200000), activation="relu"),
+    tf.keras.layers.Reshape((50000,4)),
     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
     ])
 
@@ -243,7 +243,7 @@ class GAN(keras.Model):
 
 
 
-batch_size = 512
+batch_size = 128
 x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
 
@@ -259,7 +259,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_differential_peaks_test'
+model_name='GAN_50k'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -277,6 +277,7 @@ with tf.device('/GPU:0'):
 
 generator.save(model_name + '_G.h5')  # creates a HDF5 file 'my_model.h5'
 discriminator.save(model_name + '_D.h5')
+
 # save to csv: 
 hist_csv_file = model_name+'history.csv'
 with open(hist_csv_file, mode='w') as f:
