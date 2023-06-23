@@ -156,8 +156,7 @@ X_Y=np.load('/home/florian/projet/r6.16/seq.npz')['Y']
 
 fichiers = os.listdir('/home/florian/projet/cell_types')
 
-fichiers = ['scATACseq_allT.npz',
-            'scATACseq_allGlia.npz']
+fichiers = ['scATACseq_allElse.npz']
 
 for file in fichiers:
 
@@ -183,7 +182,7 @@ for file in fichiers:
 
 
     #create scATAC values for each chr
-    cut=100
+    cut=350
     Y_2L=np.load('/home/florian/projet/cell_types/'+file)['2L'][0]
     Y_2L[Y_2L >= cut] = cut
     Y_2L=Y_2L/cut
@@ -209,8 +208,8 @@ for file in fichiers:
     Y_X=Y_X/cut
 
     Y_Y=np.load('/home/florian/projet/cell_types/'+file)['Y'][0]
-    Y_Y[Y_Y >= 10] = 10
-    Y_Y=Y_Y/10
+    Y_Y[Y_Y >= 15] = 15
+    Y_Y=Y_Y/15
 
     #generates homebrew weighted values
     x=np.concatenate((X_2L,X_4,X_3R))
@@ -297,4 +296,4 @@ for file in fichiers:
     os.chdir('/home/florian/projet/models')
     np.savez_compressed('preds_'+model_name,**preds)
 
-    del model2
+    del model2, preds

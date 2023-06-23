@@ -244,7 +244,7 @@ class GAN(keras.Model):
 
 
 batch_size = 128
-x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
+x_train = SequenceFeeder(np.concatenate((X_2L,X_2R,X_3L,X_3R,X_4,X_X)).astype('float32'), batch_size=batch_size, max_data=2**10)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
 
 gan = GAN(discriminator=discriminator, generator=generator, latent_dim=latent_dim)
@@ -259,7 +259,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_50k'
+model_name='GAN_50k_allchr'
 
 os.chdir('/home/florian/projet/generators/')
 
