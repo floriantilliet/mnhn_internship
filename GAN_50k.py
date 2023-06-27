@@ -48,33 +48,14 @@ def wasserstein_entropy_peak_loss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne  
 
-    predictions_peak1KC = predictorKC(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])#prédictions signal ATACseq
-    predictions_peak1T1 = predictorT1(y_pred[:,KC_peak_loc-1000:KC_peak_loc+1001])
-
-    predictions_peak2KC = predictorKC(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])#prédictions signal ATACseq
-    predictions_peak2T1 = predictorT1(y_pred[:,T1_peak_loc-1000:T1_peak_loc+1001])
-
-    D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
+    D['wasserstein']+=[(69_000-backend.mean(y_true*tf.ones(y_true.shape[0]))*69_000).numpy()]
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
     D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    
-    # D['peak1KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
-    # # D['peak1T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000).numpy()]
-    # D['peak1T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000).numpy()]
 
-    # D['peak2KC']+=[(tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
-    # # D['peak2T1']+=[(tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000).numpy()]
-    # D['peak2T1']+=[((requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000).numpy()]
-
-    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)
+    return ((69_000-backend.mean(y_true*tf.ones(y_true.shape[0]))*69_000)
         +tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]
         -tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0))
-        # +(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
-        # # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak1KC)/predictions_peak1KC.shape[0])*7000
-        # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak1T1)/predictions_peak1T1.shape[0])*7000
-        # +(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
-        # # +tf.math.abs(requested_peak_height-tf.math.reduce_sum(predictions_peak2T1)/predictions_peak2T1.shape[0])*7000
-        # +tf.math.abs(requested_floor_height-tf.math.reduce_sum(predictions_peak2KC)/predictions_peak2KC.shape[0])*7000)
+
 
 
 class SequenceFeeder(tf.keras.utils.Sequence):
@@ -218,7 +199,7 @@ class GAN(keras.Model):
             # Train the discriminator
             with tf.GradientTape() as tape:
                 predictions = self.discriminator(combined_sequences)
-                d_loss = (1-self.d_loss_fn(labels, predictions))*14000
+                d_loss = (1-self.d_loss_fn(labels, predictions))*69_000
             grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
                 zip(grads, self.discriminator.trainable_weights)
@@ -259,7 +240,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_50k_allchr'
+model_name='GAN_50k_allchr_sameLR'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -269,7 +250,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=10000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=5000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
