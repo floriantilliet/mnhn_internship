@@ -233,14 +233,14 @@ gan.compile(
     # d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     # g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     d_optimizer=keras.optimizers.RMSprop(lr=0.0003),
-    g_optimizer=keras.optimizers.RMSprop(lr=0.03),
+    g_optimizer=keras.optimizers.RMSprop(lr=0.003),
     # loss_fn=keras.losses.MAE
     # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
     d_loss_fn = wasserstein_loss,
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_50k_allchr_sameLR'
+model_name='GAN_50k_allchr_diffLR'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -250,7 +250,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=5000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=4000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
