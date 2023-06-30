@@ -105,7 +105,10 @@ def ohd(seq):
     -----
     """
     seq_decoded=list()
-    mapping = {"[1 0 0 0]":"A", "[0 1 0 0]":"C", "[0 0 1 0]":"G", "[0 0 0 1]":"T"}
+    mapping = {"[1 0 0 0]": "A",
+               "[0 1 0 0]": "C",
+               "[0 0 1 0]": "G",
+               "[0 0 0 1]": "T"}
     for i in seq:
         seq_decoded.append(mapping[str(i)] if str(i) in mapping.keys() else "x")
     return ''.join(seq_decoded)

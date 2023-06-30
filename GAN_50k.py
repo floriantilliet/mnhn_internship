@@ -138,6 +138,7 @@ generator = tf.keras.models.Sequential([
     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
     ])
 
+#test avec déconvolution (fonctionne pas très bien)
 # generator = tf.keras.models.Sequential([
 #     keras.Input(shape=(8000)),
 #     # tf.keras.layers.Dense(200*4, activation='relu'),
@@ -159,7 +160,7 @@ class GAN(keras.Model):
         self.discriminator = discriminator
         self.generator = generator
         self.latent_dim = latent_dim
-        self.g_steps_per_d_step = 1
+        self.g_steps_per_d_step = 3
         self.d_steps_per_g_step = 1
 
     # def call(self, inputs):
@@ -209,9 +210,7 @@ class GAN(keras.Model):
             # Sample random points in the latent space
             random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim))
 
-            # Assemble labels that say "all real sequences"
-            misleading_labels = tf.ones((batch_size, 1))
-            
+
             # Train the generator (note that we should *not* update the weights
             # of the discriminator)!
             with tf.GradientTape() as tape:
@@ -240,7 +239,7 @@ gan.compile(
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_50k_allchr_diffLR'
+model_name='GAN_50k_allchr_diffLR_early'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -250,7 +249,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=4000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=2000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
