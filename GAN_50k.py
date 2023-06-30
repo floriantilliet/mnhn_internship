@@ -97,10 +97,13 @@ discriminator = keras.Sequential(
     [
         layers.Conv1D(64, kernel_size=(5), input_shape=(50000,4)),
         layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.Dropout(0.2),
         layers.Conv1D(32, kernel_size=(9)),
         layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.Dropout(0.2),
         layers.Conv1D(16, kernel_size=(13)),
         layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.Dropout(0.2),
         layers.GlobalMaxPooling1D(),
         layers.Dense(1,activation="sigmoid"),
         layers.Lambda(lambda x: 2*x-1)
@@ -154,13 +157,14 @@ generator = tf.keras.models.Sequential([
 #     tf.keras.layers.Lambda(lambda x: tf.nn.softmax(x, axis=2))
 #     ])
 
+
 class GAN(keras.Model):
     def __init__(self, discriminator, generator, latent_dim):
         super(GAN, self).__init__()
         self.discriminator = discriminator
         self.generator = generator
         self.latent_dim = latent_dim
-        self.g_steps_per_d_step = 3
+        self.g_steps_per_d_step = 1
         self.d_steps_per_g_step = 1
 
     # def call(self, inputs):
@@ -232,14 +236,14 @@ gan.compile(
     # d_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     # g_optimizer=keras.optimizers.Adam(learning_rate=0.0003),
     d_optimizer=keras.optimizers.RMSprop(lr=0.0003),
-    g_optimizer=keras.optimizers.RMSprop(lr=0.003),
+    g_optimizer=keras.optimizers.RMSprop(lr=0.006),
     # loss_fn=keras.losses.MAE
     # loss_fn = keras.losses.BinaryCrossentropy(from_logits=False, reduction='sum_over_batch_size')
     d_loss_fn = wasserstein_loss,
     g_loss_fn= wasserstein_entropy_peak_loss
 )
 
-model_name='GAN_50k_allchr_diffLR_early'
+model_name='GAN_50k_allchr_disdropout_later'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -249,7 +253,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=2000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=100)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
