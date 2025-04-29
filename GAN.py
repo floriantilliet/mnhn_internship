@@ -22,6 +22,8 @@ D['meanseq_entropy']=[]
 D['mean_entropy']=[]
 D['wasserstein']=[]
 
+Wgc=(-0.3*np.log(0.3)*2)+(-0.2*np.log(0.2)*2)*10000
+
 def sequence_entropy(seq):
     return(sum(np.sum(-seq*np.log(seq+k.epsilon()), axis=1)))
 
@@ -32,10 +34,17 @@ def wasserstein_loss(y_true, y_pred):
 def wasserstein_gloss(y_true, y_pred):
     seq_entropy=tf.math.reduce_sum(tf.math.reduce_sum(-y_pred*tf.math.log(y_pred+k.epsilon()),axis=2),axis=1)#entropie des seq
     meanseq=tf.math.reduce_sum(y_pred,axis=0)/y_true.shape[0]#séquence moyenne
+
     D['mean_entropy']+=[(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]).numpy()]
-    D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
-    D['wasserstein']+=[(14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))).numpy()]
-    return ((14000-(tf.reduce_sum(y_true*tf.ones(y_true.shape))/y_true.shape[0])*14000)+tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]-tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0))
+    # D['mean_entropy']+=[(tf.math.abs(Wgc-(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0]))).numpy()]
+
+    # D['meanseq_entropy']+=[(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)).numpy()]
+    D['meanseq_entropy']+=[(tf.math.abs(Wgc-(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0)))).numpy()]
+    
+    # D['wasserstein']+=[(Wgc-(tf.reduce_sum(y_true*tf.ones(y_true.shape)))*Wgc).numpy()]
+    D['wasserstein']+=[((1-wasserstein_loss(y_true,tf.ones(y_true.shape)))*Wgc).numpy()]
+    
+    return ((1-wasserstein_loss(y_true,tf.ones(y_true.shape)))*Wgc)+(tf.reduce_sum(seq_entropy)/seq_entropy.shape[0])+(tf.math.abs(Wgc-(tf.math.reduce_sum(tf.math.reduce_sum(-meanseq*tf.math.log(meanseq+k.epsilon()),axis=1),axis=0))))
 
 # def wasserstein_entropy_loss(y_true,y_pred):
 #     mean_sequence = tf.math.reduce_sum(y_true+y_pred,axis=0)/y_true.shape[0]
@@ -101,15 +110,16 @@ discriminator = keras.Sequential(
     [
         layers.Conv1D(64, kernel_size=(5), input_shape=(10000,4)),
         layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.Dropout(0.2),
         layers.Conv1D(32, kernel_size=(9)),
         layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.Dropout(0.2),
         layers.Conv1D(16, kernel_size=(13)),
         layers.LeakyReLU(alpha=0.2),
+        tf.keras.layers.Dropout(0.2),
         layers.GlobalMaxPooling1D(),
         layers.Dense(1,activation="sigmoid"),
         layers.Lambda(lambda x: 2*x-1)
-
-
     ],
     name="discriminator",
 )
@@ -127,13 +137,17 @@ latent_dim=10
 generator = tf.keras.models.Sequential([
     keras.Input(shape=(latent_dim)),
     tf.keras.layers.Dense(200*4, activation='relu'),
+    tf.keras.layers.Dropout(0.2),
     tf.keras.layers.Reshape((200,4)),
     tf.keras.layers.Conv1D(32, kernel_size=(5), activation='relu'),
+    tf.keras.layers.Dropout(0.2),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Conv1D(16, kernel_size=(11), activation='relu'),
+    tf.keras.layers.Dropout(0.2),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.Conv1D(8, kernel_size=(19), activation='relu'),
+    tf.keras.layers.Dropout(0.2),
     tf.keras.layers.MaxPooling1D(pool_size=(2)),
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Flatten(),
@@ -204,7 +218,7 @@ class GAN(keras.Model):
             # Train the discriminator
             with tf.GradientTape() as tape:
                 predictions = self.discriminator(combined_sequences)
-                d_loss = (1-self.d_loss_fn(labels, predictions))*14000
+                d_loss = (1-self.d_loss_fn(labels, predictions))*Wgc
             grads = tape.gradient(d_loss, self.discriminator.trainable_weights)
             self.d_optimizer.apply_gradients(
                 zip(grads, self.discriminator.trainable_weights)
@@ -232,6 +246,7 @@ class GAN(keras.Model):
                 generated_sequences = self.generator(random_latent_vectors)
                 predictions = self.discriminator(generated_sequences)
                 g_loss=self.g_loss_fn(predictions,generated_sequences)
+                # g_loss=(1-self.g_loss_fn(misleading_labels,predictions))
             grads = tape.gradient(g_loss, self.generator.trainable_weights)
             self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_weights))
         return {"d_loss":d_loss, "g_loss":g_loss}
@@ -239,7 +254,7 @@ class GAN(keras.Model):
 
 
 batch_size = 512
-x_train = SequenceFeeder(X_2L.astype('float32'), batch_size=batch_size, max_data=2**10)
+x_train = SequenceFeeder(np.concatenate((X_2L,X_2R,X_3L,X_3R,X_4,X_X)).astype('float32'), batch_size=batch_size, max_data=2**10)
 # x_test = SequenceFeeder(X_2R.astype('float32'), batch_size=batch_size, max_data=2**5)
 
 gan = GAN(discriminator=discriminator, generator=generator, latent_dim=latent_dim)
@@ -254,7 +269,7 @@ gan.compile(
     g_loss_fn= wasserstein_gloss
 )
 
-model_name='new_try_separated'
+model_name='new_entropy_mod'
 
 os.chdir('/home/florian/projet/generators/')
 
@@ -264,7 +279,7 @@ early_stop_callback = tf.keras.callbacks.EarlyStopping(monitor='g_loss',patience
 checkpoint= tf.keras.callbacks.ModelCheckpoint(filepath='/home/florian/projet/generators/'+model_name)
 
 with tf.device('/GPU:0'):
-    history=gan.fit(x_train, epochs=1000)#,callbacks=[checkpoint])
+    history=gan.fit(x_train, epochs=10000)#,callbacks=[checkpoint])
 
     # convert the history.history dict to a pandas DataFrame:     
     hist_df = pd.DataFrame(history.history) 
